@@ -32,7 +32,7 @@ export function Timer({
   const displayLabel = isPaused
     ? "Paused"
     : isSetupCountdown
-    ? "Get Ready"
+    ? "Starting"
     : isTransitionCountdown
     ? "DONE"
     : isRunning
