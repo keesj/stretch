@@ -53,7 +53,6 @@ export function Session() {
 
   const [setupCountdown, setSetupCountdown] = useState<number | null>(null);
   const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
-  const [waitingForStart, setWaitingForStart] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
 
   const isSetupCountdown = setupCountdown !== null;
@@ -69,11 +68,26 @@ export function Session() {
   useEffect(() => {
     console.log('[Session] currentExercise changed:', currentExercise.title, 'duration:', currentExercise.duration);
     resetTimer(currentExercise.duration);
-    setWaitingForStart(true);
     setTransitionCountdown(null);
     setShowNextPreview(false);
     setSetupCountdown(null);
-  }, [currentExercise, resetTimer]);
+
+    // Auto-start countdown
+    setSetupCountdown(3);
+    const timer = setInterval(() => {
+      setSetupCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          setSetupCountdown(null);
+          start();
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentExercise, resetTimer, start]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
@@ -169,13 +183,13 @@ export function Session() {
 
       <div className="my-8">
         <Timer
-          displayTime={transitionCountdown ?? timeLeft}
+          displayTime={timeLeft}
           isRunning={isRunning}
           isPaused={isPaused}
           isSetupCountdown={isSetupCountdown}
           isTransitionCountdown={isTransitionCountdown}
           totalDuration={currentExercise.duration}
-          countdownDisplay={isSetupCountdown ? setupCountdown : null}
+          countdownDisplay={isTransitionCountdown ? transitionCountdown : null}
         />
       </div>
 
@@ -247,21 +261,7 @@ export function Session() {
             if (isSetupCountdown) {
               return;
             }
-            if (waitingForStart) {
-              setSetupCountdown(3);
-              setWaitingForStart(false);
-              const timer = setInterval(() => {
-                setSetupCountdown((prev) => {
-                  if (prev === null || prev <= 1) {
-                    clearInterval(timer);
-                    setSetupCountdown(null);
-                    start();
-                    return null;
-                  }
-                  return prev - 1;
-                });
-              }, 1000);
-            } else if (isPaused) {
+            if (isPaused) {
               start();
             } else {
               pause();
@@ -271,8 +271,6 @@ export function Session() {
         >
           {isSetupCountdown 
             ? `${currentExercise.duration} + ${setupCountdown}` 
-            : waitingForStart 
-            ? "Start" 
             : isPaused 
             ? "Resume" 
             : "Pause"}
