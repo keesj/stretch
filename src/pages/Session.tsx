@@ -63,7 +63,8 @@ export function Session() {
     initialTime: currentExercise.duration,
     onComplete: () => {
       console.log('[Session] Timer complete, calling nextExercise');
-      console.log('[Session] isRunning:', isRunning, 'timeLeft:', timeLeft);
+      console.log('[Session] isRunning:', isRunning, 'timeLeft:', timeLeft, 'currentExerciseIndex:', currentExerciseIndex);
+      console.log('[Session] Current exercise:', currentExercise.title);
       nextExercise();
     },
   });
@@ -88,12 +89,13 @@ export function Session() {
     if (setupCountdown === 1) {
       const timer = setTimeout(() => {
         console.log('[Session] Calling start() after countdown');
+        resetTimer(currentExercise.duration);
         setSetupCountdown(null);
         start();
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [setupCountdown, start]);
+  }, [setupCountdown, start, resetTimer, currentExercise]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {

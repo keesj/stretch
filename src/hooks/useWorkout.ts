@@ -79,8 +79,10 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
 
   const nextExercise = useCallback(() => {
     console.log('[useWorkout] nextExercise called, current index:', currentExerciseIndexRef.current);
+    console.log('[useWorkout] totalExercises:', totalExercises);
     setCurrentExerciseIndex((prev) => {
       const newIndex = prev + 1;
+      console.log('[useWorkout] prev:', prev, 'newIndex:', newIndex, 'totalExercises:', totalExercises);
       if (newIndex >= totalExercises) {
         console.log('[useWorkout] finishing workout');
         finishWorkout();
