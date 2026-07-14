@@ -51,7 +51,7 @@ export function Session() {
     },
   });
 
-  const { timeLeft, start, pause, resume, reset: resetTimer, skip } = useTimer({
+  const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
     onComplete: nextExercise,
   });
@@ -177,15 +177,13 @@ export function Session() {
           Previous
         </Button>
 
-        {isPaused ? (
-          <Button onClick={resume} className="flex-1">
-            Resume
-          </Button>
-        ) : (
-          <Button variant="secondary" onClick={pause} className="flex-1">
-            Pause
-          </Button>
-        )}
+        <Button
+          variant={isPaused ? "primary" : "secondary"}
+          onClick={isPaused ? start : pause}
+          className="flex-1"
+        >
+          {isPaused ? "Restart" : "Pause"}
+        </Button>
 
         <Button onClick={handleSkip} className="flex-1">
           Skip

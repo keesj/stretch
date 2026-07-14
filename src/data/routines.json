@@ -1,5 +1,11 @@
 [
   {
+    "id": "wake-up-workout",
+    "title": "Wake Up Workout",
+    "description": "A quick 30-second stretch routine to energize your body in the morning",
+    "stretches": ["upward-salute", "toe-touch", "lunge-left", "lunge-right", "upward-dog", "childs-pose", "downward-dog-wake", "wide-leg-bend", "upward-salute"]
+  },
+  {
     "id": "morning-back-release",
     "title": "Morning Back Release",
     "description": "A gentle routine to wake up your spine and release morning stiffness",

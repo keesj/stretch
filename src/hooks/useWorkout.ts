@@ -57,10 +57,13 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   }, [currentExerciseIndex, totalExercises]);
 
   const previousExercise = useCallback(() => {
-    if (currentExerciseIndex > 0) {
-      setCurrentExerciseIndex((prev) => prev - 1);
-    }
-  }, [currentExerciseIndex]);
+    setCurrentExerciseIndex((prev) => {
+      if (prev > 0) {
+        return prev - 1;
+      }
+      return prev;
+    });
+  }, []);
 
   const finishWorkout = useCallback(() => {
     stopTimer();

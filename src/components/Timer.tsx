@@ -14,9 +14,7 @@ export function Timer({ timeLeft, isRunning, isPaused }: TimerProps) {
       >
         {formatTime(timeLeft)}
       </div>
-      <div
-        className={`mt-2 text-sm font-medium ${isRunning ? "text-primary-600" : "text-gray-400"}`}
-      >
+      <div className="mt-2 text-sm font-medium text-gray-400">
         {isPaused ? "Paused" : isRunning ? "Running" : "Ready"}
       </div>
     </div>

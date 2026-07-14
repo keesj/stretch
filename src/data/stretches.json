@@ -177,5 +177,125 @@
     "bodyParts": ["spine", "back"],
     "difficulty": "medium",
     "illustration": "🎡"
+  },
+  {
+    "id": "upward-salute",
+    "title": "Upward Salute",
+    "duration": 30,
+    "instructions": [
+      "Stand tall with feet hip-width apart",
+      "Inhale and reach arms overhead",
+      "Gently arch your back",
+      "Hold for a few breaths",
+      "Exhale and lower arms"
+    ],
+    "bodyParts": ["spine", "shoulders", "chest"],
+    "difficulty": "easy",
+    "illustration": "🙆"
+  },
+  {
+    "id": "toe-touch",
+    "title": "Toe Touch",
+    "duration": 30,
+    "instructions": [
+      "Stand with feet together",
+      "Hinge at your hips",
+      "Reach toward your toes",
+      "Keep knees slightly bent",
+      "Hold and release slowly"
+    ],
+    "bodyParts": ["hamstrings", "lower back"],
+    "difficulty": "easy",
+    "illustration": "🧎"
+  },
+  {
+    "id": "lunge-left",
+    "title": "Lunge (Left)",
+    "duration": 30,
+    "instructions": [
+      "Step your left foot forward",
+      "Lower your hips down and back",
+      "Keep front knee behind toe",
+      "Hold your right foot with hands",
+      "Feel the stretch in your right hip flexor"
+    ],
+    "bodyParts": ["hips", "quads", "hamstrings"],
+    "difficulty": "easy",
+    "illustration": "🦵"
+  },
+  {
+    "id": "lunge-right",
+    "title": "Lunge (Right)",
+    "duration": 30,
+    "instructions": [
+      "Step your right foot forward",
+      "Lower your hips down and back",
+      "Keep front knee behind toe",
+      "Hold your left foot with hands",
+      "Feel the stretch in your left hip flexor"
+    ],
+    "bodyParts": ["hips", "quads", "hamstrings"],
+    "difficulty": "easy",
+    "illustration": "🦵"
+  },
+  {
+    "id": "upward-dog",
+    "title": "Upward Dog",
+    "duration": 30,
+    "instructions": [
+      "Lie on your stomach",
+      "Place hands under shoulders",
+      "Press into hands to lift chest",
+      "Straighten arms and lift hips",
+      "Look slightly up, not straight ahead"
+    ],
+    "bodyParts": ["spine", "chest", "shoulders"],
+    "difficulty": "medium",
+    "illustration": "🐕"
+  },
+  {
+    "id": "childs-pose",
+    "title": "Child's Pose",
+    "duration": 30,
+    "instructions": [
+      "Kneel on the floor",
+      "Sit back on your heels",
+      "Fold forward over your thighs",
+      "Rest your forehead on the ground",
+      "Relax your arms beside your body"
+    ],
+    "bodyParts": ["back", "hips"],
+    "difficulty": "easy",
+    "illustration": "🧘"
+  },
+  {
+    "id": "downward-dog-wake",
+    "title": "Downward Dog",
+    "duration": 30,
+    "instructions": [
+      "Start on hands and knees",
+      "Lift hips up and back",
+      "Form an inverted V shape",
+      "Press hands firmly into the floor",
+      "Take 3-5 deep breaths"
+    ],
+    "bodyParts": ["hamstrings", "shoulders", "spine"],
+    "difficulty": "medium",
+    "illustration": "🐕"
+  },
+  {
+    "id": "wide-leg-bend",
+    "title": "Wide Leg Bend",
+    "duration": 30,
+    "instructions": [
+      "Stand with legs wide apart",
+      "Point toes slightly forward",
+      "Hinge at your hips",
+      "Lower your torso toward the floor",
+      "Let your head hang heavy"
+    ],
+    "bodyParts": ["hamstrings", "inner thighs", "lower back"],
+    "difficulty": "easy",
+    "illustration": "🌟"
   }
 ]

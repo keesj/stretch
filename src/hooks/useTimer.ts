@@ -27,7 +27,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, isPaused, countdown, timeLeft]);
+  }, [isRunning, isPaused, countdown]);
 
   useEffect(() => {
     if (timeLeft === 0 && isRunning && onComplete) {
