@@ -19,17 +19,22 @@ export function Timer({
   totalDuration = 60,
   countdownDisplay = null,
 }: TimerProps) {
-  const showTime = countdownDisplay ?? displayTime;
+  // Show dots during setup countdown
+  const displayText = isSetupCountdown && countdownDisplay !== null && countdownDisplay > 0
+    ? `${totalDuration}${'.'.repeat(4 - countdownDisplay)}`
+    : countdownDisplay !== null
+    ? countdownDisplay
+    : displayTime;
   const progress = isSetupCountdown 
     ? 0 
     : isPaused
-    ? ((totalDuration - showTime) / totalDuration) * 100
-    : ((totalDuration - showTime) / totalDuration) * 100;
+    ? ((totalDuration - (countdownDisplay !== null ? countdownDisplay : displayTime)) / totalDuration) * 100
+    : ((totalDuration - (countdownDisplay !== null ? countdownDisplay : displayTime)) / totalDuration) * 100;
 
   const displayLabel = isPaused
     ? "Paused"
     : isSetupCountdown
-    ? "Starting"
+    ? "Get Ready"
     : isTransitionCountdown
     ? "DONE"
     : isRunning
@@ -39,7 +44,7 @@ export function Timer({
   return (
     <div className="flex flex-col items-center w-full max-w-xs">
       <motion.div
-        key={showTime}
+        key={displayText}
         initial={isTransitionCountdown ? { scale: 1.1, opacity: 0.8 } : {}}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
@@ -53,7 +58,7 @@ export function Timer({
             : "text-gray-800 dark:text-gray-100"
         }`}
       >
-        {showTime}
+        {displayText}
       </motion.div>
       <div className="mt-2 text-sm font-medium text-gray-400">
         {displayLabel}

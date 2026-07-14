@@ -56,7 +56,7 @@ export function Session() {
   const [showInstructions, setShowInstructions] = useState(false);
 
   const isSetupCountdown = setupCountdown !== null && setupCountdown <= 3;
-  const isTransitionCountdown = transitionCountdown !== null;
+  const isTransitionCountdown = transitionCountdown !== null && transitionCountdown > 0;
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
@@ -72,30 +72,30 @@ export function Session() {
     setShowNextPreview(false);
     setSetupCountdown(3);
 
-    // Setup countdown: 3, 2, 1
-    const timer = setInterval(() => {
-      setSetupCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer);
-          setSetupCountdown(null);
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
+    // Auto-start countdown after exercise loads
+    if (setupCountdown === 3) {
+      const timer = setInterval(() => {
+        setSetupCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(timer);
+            setSetupCountdown(null);
+            start();
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
   }, [currentExercise, resetTimer, start]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
       setShowNextPreview(true);
       setTransitionCountdown(timeLeft);
-    } else if (timeLeft === 0 && !isCompleted) {
-      setShowNextPreview(false);
-      setTransitionCountdown(null);
     } else {
       setShowNextPreview(false);
+      setTransitionCountdown(null);
     }
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
@@ -257,7 +257,7 @@ export function Session() {
         </Button>
 
         <Button
-          variant="primary"
+          variant={isPaused ? "primary" : "secondary"}
           onClick={() => {
             if (isPaused) {
               start();
@@ -267,7 +267,7 @@ export function Session() {
           }}
           className="flex-1"
         >
-          Pause
+          {isPaused ? "Resume" : "Pause"}
         </Button>
 
         <Button onClick={handleSkip} className="flex-1">
