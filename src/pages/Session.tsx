@@ -51,20 +51,42 @@ export function Session() {
     },
   });
 
+  const [setupCountdown, setSetupCountdown] = useState<number | null>(null);
+  const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
+
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
     onComplete: nextExercise,
   });
 
   useEffect(() => {
-    resetTimer(currentExercise.duration);
-  }, [currentExercise, resetTimer]);
+    setSetupCountdown(3);
+    const timer = setInterval(() => {
+      setSetupCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          setSetupCountdown(null);
+          start();
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentExercise, start]);
+
+  const [showNextPreview, setShowNextPreview] = useState(false);
 
   useEffect(() => {
-    if (!isPaused && !isCompleted) {
-      start();
+    if (!isPaused && !isCompleted && timeLeft <= 3 && currentExerciseIndex < totalExercises - 1) {
+      setShowNextPreview(true);
+      setTransitionCountdown(timeLeft);
+    } else {
+      setShowNextPreview(false);
+      setTransitionCountdown(null);
     }
-  }, [isPaused, isCompleted, start]);
+  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
   const handleSkip = () => {
     skip();
@@ -149,8 +171,36 @@ export function Session() {
         </motion.div>
       </AnimatePresence>
 
+      {showNextPreview && currentExerciseIndex < totalExercises - 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="my-6"
+        >
+          <Card className="p-4 bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800">
+            <div className="text-center">
+              <div className="text-sm text-primary-600 dark:text-primary-400 mb-2">
+                Next up
+              </div>
+              <div className="text-lg font-semibold mb-1">
+                {exerciseStretches[currentExerciseIndex + 1]?.title}
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {exerciseStretches[currentExerciseIndex + 1]?.illustration}
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
       <div className="my-8">
-        <Timer timeLeft={timeLeft} isRunning={!isPaused} isPaused={isPaused} />
+        <Timer
+          timeLeft={timeLeft}
+          isRunning={isRunning}
+          isPaused={isPaused}
+          setupCountdown={setupCountdown}
+          transitionCountdown={transitionCountdown}
+        />
       </div>
 
       <div className="space-y-3">
