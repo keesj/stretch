@@ -71,9 +71,10 @@ export function Session() {
     setAutoStarted(false);
     setTransitionCountdown(null);
     setShowNextPreview(false);
+    setSetupCountdown(null);
 
     if (!autoStarted) {
-      setSetupCountdown(currentExercise.duration);
+      setSetupCountdown(3);
       setWaitingForStart(false);
       setAutoStarted(true);
       const timer = setInterval(() => {

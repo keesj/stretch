@@ -17,16 +17,14 @@ export function Timer({
   transitionCountdown,
   totalDuration = 60,
 }: TimerProps) {
-  const displayTime = setupCountdown ?? transitionCountdown ?? timeLeft;
   const isSetupCountdown = setupCountdown !== null;
   const isTransitionCountdown = transitionCountdown !== null;
+  const displayTime = isSetupCountdown ? totalDuration : (transitionCountdown ?? timeLeft);
 
   const progress = isSetupCountdown 
     ? 0 
     : isPaused
     ? ((totalDuration - timeLeft) / totalDuration) * 100
-    : isTransitionCountdown
-    ? 100
     : ((totalDuration - timeLeft) / totalDuration) * 100;
 
   const displayLabel = isPaused
