@@ -16,19 +16,22 @@ export function Timer({
   transitionCountdown,
 }: TimerProps) {
   const displayTime = setupCountdown ?? transitionCountdown ?? timeLeft;
-  const isCountdown = setupCountdown !== null || transitionCountdown !== null;
-  const totalDuration = isCountdown ? 3 : 60;
+  const isSetupCountdown = setupCountdown !== null;
+  const isTransitionCountdown = transitionCountdown !== null;
+  const isCountdown = isSetupCountdown || isTransitionCountdown;
 
   return (
     <div className="flex flex-col items-center w-full max-w-xs">
       <motion.div
         key={displayTime}
-        initial={{ scale: 1.1, opacity: 0.8 }}
+        initial={isTransitionCountdown ? { scale: 1.1, opacity: 0.8 } : {}}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
         className={`text-6xl font-light ${
-          isCountdown
+          isTransitionCountdown
             ? "text-primary-500"
+            : isSetupCountdown
+            ? "text-primary-400"
             : isPaused
             ? "text-primary-400"
             : "text-gray-800 dark:text-gray-100"
@@ -39,13 +42,15 @@ export function Timer({
       <div className="mt-2 text-sm font-medium text-gray-400">
         {isPaused
           ? "Paused"
-          : isCountdown
+          : isSetupCountdown
           ? "Get Ready"
+          : isTransitionCountdown
+          ? "Almost Done"
           : isRunning
           ? "Running"
           : "Ready"}
       </div>
-      {isCountdown && (
+      {isTransitionCountdown && (
         <div className="mt-4 w-full">
           <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <motion.div
