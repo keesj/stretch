@@ -54,6 +54,7 @@ export function Session() {
   const [setupCountdown, setSetupCountdown] = useState<number | null>(null);
   const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
   const [waitingForStart, setWaitingForStart] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(true);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
@@ -195,19 +196,35 @@ export function Session() {
         />
       </div>
 
-      <div className="space-y-3">
-        {currentExercise.instructions.map((instruction, index) => (
-          <motion.p
-            key={index}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: index * 0.1 }}
-            className="text-center text-gray-600 dark:text-gray-400 text-sm"
+      <button
+        onClick={() => setShowInstructions(!showInstructions)}
+        className="text-sm text-primary-600 dark:text-primary-400 hover:underline mb-3"
+      >
+        {showInstructions ? "Hide Instructions" : "Show Instructions"}
+      </button>
+
+      <AnimatePresence>
+        {showInstructions && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-3"
           >
-            {index + 1}. {instruction}
-          </motion.p>
-        ))}
-      </div>
+            {currentExercise.instructions.map((instruction, index) => (
+              <motion.p
+                key={index}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: index * 0.1 }}
+                className="text-center text-gray-600 dark:text-gray-400 text-sm"
+              >
+                {index + 1}. {instruction}
+              </motion.p>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="mt-8 flex gap-3">
         <Button
