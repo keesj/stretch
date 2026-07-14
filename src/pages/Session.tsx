@@ -54,6 +54,7 @@ export function Session() {
   const [setupCountdown, setSetupCountdown] = useState<number | null>(null);
   const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [showStartButton, setShowStartButton] = useState(true);
 
   const isSetupCountdown = setupCountdown !== null && setupCountdown <= 3;
   const isTransitionCountdown = transitionCountdown !== null && transitionCountdown > 0;
@@ -70,24 +71,9 @@ export function Session() {
     resetTimer(currentExercise.duration);
     setTransitionCountdown(null);
     setShowNextPreview(false);
-    setSetupCountdown(3);
-
-    // Auto-start countdown after exercise loads
-    if (setupCountdown === 3) {
-      const timer = setInterval(() => {
-        setSetupCountdown((prev) => {
-          if (prev === null || prev <= 1) {
-            clearInterval(timer);
-            setSetupCountdown(null);
-            start();
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [currentExercise, resetTimer, start]);
+    setSetupCountdown(null);
+    setShowStartButton(true);
+  }, [currentExercise, resetTimer]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
@@ -101,11 +87,13 @@ export function Session() {
 
   const handleSkip = () => {
     skip();
+    setShowStartButton(true);
     nextExercise();
   };
 
   const handlePrevious = () => {
     if (currentExerciseIndex > 0) {
+      setShowStartButton(true);
       previousExercise();
     }
   };
@@ -257,9 +245,24 @@ export function Session() {
         </Button>
 
         <Button
-          variant={isPaused ? "primary" : "secondary"}
+          variant={showStartButton ? "secondary" : isPaused ? "primary" : "secondary"}
           onClick={() => {
-            if (isPaused) {
+            if (showStartButton) {
+              setShowStartButton(false);
+              setSetupCountdown(3);
+              const timer = setInterval(() => {
+                setSetupCountdown((prev) => {
+                  if (prev === null || prev <= 1) {
+                    clearInterval(timer);
+                    setSetupCountdown(null);
+                    start();
+                    return null;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
+              return () => clearInterval(timer);
+            } else if (isPaused) {
               start();
             } else {
               pause();
@@ -267,7 +270,7 @@ export function Session() {
           }}
           className="flex-1"
         >
-          {isPaused ? "Resume" : "Pause"}
+          {showStartButton ? "Start" : isPaused ? "Resume" : "Pause"}
         </Button>
 
         <Button onClick={handleSkip} className="flex-1">
