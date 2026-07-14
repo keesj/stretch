@@ -66,18 +66,16 @@ export function Session() {
     if (!isPaused && !isCompleted && timeLeft <= 3 && currentExerciseIndex < totalExercises - 1) {
       setShowNextPreview(true);
       setTransitionCountdown(timeLeft);
-    } else if (timeLeft === 0) {
-      setShowNextPreview(false);
-      setTransitionCountdown(null);
-      setWaitingForStart(true);
     } else {
       setShowNextPreview(false);
       setTransitionCountdown(null);
     }
-  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises, currentExercise]);
+  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
   useEffect(() => {
     setWaitingForStart(true);
+    setTransitionCountdown(null);
+    setShowNextPreview(false);
   }, [currentExercise]);
 
   const handleSkip = () => {
