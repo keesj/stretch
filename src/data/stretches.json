@@ -1,0 +1,181 @@
+[
+  {
+    "id": "cat-cow",
+    "title": "Cat-Cow Stretch",
+    "duration": 60,
+    "instructions": [
+      "Start on your hands and knees",
+      "Inhale and arch your back, looking up",
+      "Exhale and round your spine, tucking your chin",
+      "Move slowly with your breath"
+    ],
+    "bodyParts": ["spine", "back"],
+    "difficulty": "easy",
+    "illustration": "🐱"
+  },
+  {
+    "id": "child-pose",
+    "title": "Child's Pose",
+    "duration": 90,
+    "instructions": [
+      "Kneel on the floor with knees wide",
+      "Sit back on your heels",
+      "Fold forward and extend your arms",
+      "Rest your forehead on the ground",
+      "Breathe deeply into your back"
+    ],
+    "bodyParts": ["back", "hips"],
+    "difficulty": "easy",
+    "illustration": "🧘"
+  },
+  {
+    "id": "downward-dog",
+    "title": "Downward Dog",
+    "duration": 90,
+    "instructions": [
+      "Start on hands and knees",
+      "Lift your hips up and back",
+      "Press your chest toward your thighs",
+      "Keep your hands hip-width apart",
+      "Heels can lift slightly"
+    ],
+    "bodyParts": ["spine", "hamstrings", "shoulders"],
+    "difficulty": "medium",
+    "illustration": "🐕"
+  },
+  {
+    "id": "seated-forward-fold",
+    "title": "Seated Forward Fold",
+    "duration": 90,
+    "instructions": [
+      "Sit with legs extended forward",
+      "Keep your back straight",
+      "Hinge at your hips",
+      "Reach toward your feet",
+      "Hold and breathe deeply"
+    ],
+    "bodyParts": ["hamstrings", "lower back"],
+    "difficulty": "medium",
+    "illustration": "🙏"
+  },
+  {
+    "id": "cobra-pose",
+    "title": "Cobra Pose",
+    "duration": 60,
+    "instructions": [
+      "Lie on your stomach",
+      "Place hands under your shoulders",
+      "Press into your hands to lift chest",
+      "Keep hips on the ground",
+      "Gently arch your back"
+    ],
+    "bodyParts": ["spine", "chest"],
+    "difficulty": "medium",
+    "illustration": "🐍"
+  },
+  {
+    "id": "knee-to-chest",
+    "title": "Knee to Chest",
+    "duration": 60,
+    "instructions": [
+      "Lie on your back",
+      "Pull one knee toward your chest",
+      "Keep the other leg extended",
+      "Hold for deep breaths",
+      "Switch legs"
+    ],
+    "bodyParts": ["lower back", "glutes"],
+    "difficulty": "easy",
+    "illustration": "🤲"
+  },
+  {
+    "id": "spine-twist",
+    "title": "Supine Spine Twist",
+    "duration": 90,
+    "instructions": [
+      "Lie on your back",
+      "Bring knees to chest",
+      "Drop both knees to one side",
+      "Look in the opposite direction",
+      "Keep shoulders on the ground"
+    ],
+    "bodyParts": ["spine", "lower back"],
+    "difficulty": "easy",
+    "illustration": "🔄"
+  },
+  {
+    "id": "pyramid-pose",
+    "title": "Pyramid Pose",
+    "duration": 90,
+    "instructions": [
+      "Step one foot forward",
+      "Keep front leg straight",
+      "Hinge at the hip",
+      "Lower your torso",
+      "Hold and breathe"
+    ],
+    "bodyParts": ["hamstrings", "hips"],
+    "difficulty": "hard",
+    "illustration": "⛰️"
+  },
+  {
+    "id": "half-pigeon",
+    "title": "Half Pigeon",
+    "duration": 90,
+    "instructions": [
+      "Start in downward dog",
+      "Bring one knee forward",
+      "Extend the other leg back",
+      "Square your hips",
+      "Fold forward if comfortable"
+    ],
+    "bodyParts": ["hips", "glutes"],
+    "difficulty": "medium",
+    "illustration": "🕊️"
+  },
+  {
+    "id": "thread-the-needle",
+    "title": "Thread the Needle",
+    "duration": 60,
+    "instructions": [
+      "Start on hands and knees",
+      "Slide one arm under the other",
+      "Rest your shoulder and cheek",
+      "Breathe into your back",
+      "Switch sides"
+    ],
+    "bodyParts": ["shoulders", "upper back"],
+    "difficulty": "easy",
+    "illustration": "🧵"
+  },
+  {
+    "id": "standing-forward-fold",
+    "title": "Standing Forward Fold",
+    "duration": 90,
+    "instructions": [
+      "Stand with feet hip-width apart",
+      "Hinge at your hips",
+      "Let your head hang heavy",
+      "Bend your knees if needed",
+      "Hold and relax"
+    ],
+    "bodyParts": ["hamstrings", "spine"],
+    "difficulty": "easy",
+    "illustration": "🌳"
+  },
+  {
+    "id": "wheelspike",
+    "title": "Spinal Roll Down",
+    "duration": 90,
+    "instructions": [
+      "Stand tall with feet hip-width apart",
+      "Slowly roll down vertebra by vertebra",
+      "Reach for the floor",
+      "Roll back up slowly",
+      "Move with control"
+    ],
+    "bodyParts": ["spine", "back"],
+    "difficulty": "medium",
+    "illustration": "🎡"
+  }
+]

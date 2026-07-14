@@ -1,0 +1,26 @@
+[
+  {
+    "id": "morning-back-release",
+    "title": "Morning Back Release",
+    "description": "A gentle routine to wake up your spine and release morning stiffness",
+    "stretches": ["cat-cow", "child-pose", "seated-forward-fold", "knee-to-chest"]
+  },
+  {
+    "id": "midday-decompress",
+    "title": "Midday Decompress",
+    "description": "Quick stretches to reset after sitting at your desk",
+    "stretches": ["downward-dog", "thread-the-needle", "spine-twist", "standing-forward-fold"]
+  },
+  {
+    "id": "evening-unwind",
+    "title": "Evening Unwind",
+    "description": "Relaxing stretches to release tension from your day",
+    "stretches": ["child-pose", "supine-spine-twist", "half-pigeon", "cobra-pose"]
+  },
+  {
+    "id": "flexibility-builder",
+    "title": "Flexibility Builder",
+    "description": "A more challenging routine to improve overall back flexibility",
+    "stretches": ["downward-dog", "pyramid-pose", "cobra-pose", "seated-forward-fold", "half-pigeon"]
+  }
+]
