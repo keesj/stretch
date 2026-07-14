@@ -74,7 +74,7 @@ export function Session() {
       setShowNextPreview(false);
       setTransitionCountdown(null);
     }
-  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
+  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises, currentExercise]);
 
   useEffect(() => {
     setWaitingForStart(true);
