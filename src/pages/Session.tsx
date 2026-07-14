@@ -59,14 +59,16 @@ export function Session() {
     onComplete: nextExercise,
   });
 
+  const [exerciseStarted, setExerciseStarted] = useState(false);
+
   useEffect(() => {
+    setExerciseStarted(false);
     setSetupCountdown(3);
     const timer = setInterval(() => {
       setSetupCountdown((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(timer);
           setSetupCountdown(null);
-          start();
           return null;
         }
         return prev - 1;
@@ -74,7 +76,13 @@ export function Session() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [currentExercise, start]);
+  }, [currentExercise]);
+
+  useEffect(() => {
+    if (!isPaused && !isCompleted && exerciseStarted) {
+      start();
+    }
+  }, [exerciseStarted, isPaused, isCompleted, start]);
 
   const [showNextPreview, setShowNextPreview] = useState(false);
 
@@ -228,15 +236,23 @@ export function Session() {
         </Button>
 
         <Button
-          variant={isPaused ? "primary" : "secondary"}
-          onClick={isPaused ? start : pause}
+          variant={!exerciseStarted || isPaused ? "primary" : "secondary"}
+          onClick={() => {
+            if (!exerciseStarted) {
+              setExerciseStarted(true);
+            } else if (isPaused) {
+              start();
+            } else {
+              pause();
+            }
+          }}
           className="flex-1"
         >
-          {isPaused ? "Restart" : "Pause"}
+          {!exerciseStarted ? "Start" : isPaused ? "Resume" : "Pause"}
         </Button>
 
         <Button onClick={handleSkip} className="flex-1">
-          Skip
+          Next
         </Button>
       </div>
     </motion.div>
