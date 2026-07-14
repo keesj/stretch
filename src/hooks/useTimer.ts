@@ -65,7 +65,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   );
 
   const skip = useCallback(() => {
-    // Skip doesn't trigger onComplete, caller must call nextExercise()
+    setTimeLeft(0);
   }, []);
 
   return {
