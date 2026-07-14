@@ -11,6 +11,8 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
+  console.log('[useTimer] initialized with initialTime:', initialTime, 'timeLeft:', timeLeft);
+
   const countdown = useCallback(() => {
     setTimeLeft((prev) => {
       if (prev > 0) {

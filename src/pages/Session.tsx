@@ -60,6 +60,8 @@ export function Session() {
     onComplete: nextExercise,
   });
 
+  console.log('[Session] Timer initialized, currentExercise:', currentExercise.title, 'duration:', currentExercise.duration, 'timeLeft:', timeLeft);
+
   const [showNextPreview, setShowNextPreview] = useState(false);
 
   useEffect(() => {
