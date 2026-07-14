@@ -19,7 +19,7 @@ export function Timer({
   totalDuration = 60,
   countdownDisplay = null,
 }: TimerProps) {
-  const showTime = isSetupCountdown ? totalDuration : (countdownDisplay ?? displayTime);
+  const showTime = countdownDisplay ?? displayTime;
   const progress = isSetupCountdown 
     ? 0 
     : isPaused
