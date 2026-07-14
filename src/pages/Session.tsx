@@ -169,12 +169,13 @@ export function Session() {
 
       <div className="my-8">
         <Timer
-          displayTime={isSetupCountdown ? currentExercise.duration : (transitionCountdown ?? timeLeft)}
+          displayTime={transitionCountdown ?? timeLeft}
           isRunning={isRunning}
           isPaused={isPaused}
           isSetupCountdown={isSetupCountdown}
           isTransitionCountdown={isTransitionCountdown}
           totalDuration={currentExercise.duration}
+          countdownDisplay={isSetupCountdown ? setupCountdown : null}
         />
       </div>
 

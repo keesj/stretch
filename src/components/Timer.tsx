@@ -7,6 +7,7 @@ interface TimerProps {
   isSetupCountdown?: boolean;
   isTransitionCountdown?: boolean;
   totalDuration?: number;
+  countdownDisplay?: number | null;
 }
 
 export function Timer({
@@ -16,12 +17,14 @@ export function Timer({
   isSetupCountdown = false,
   isTransitionCountdown = false,
   totalDuration = 60,
+  countdownDisplay = null,
 }: TimerProps) {
+  const showTime = isSetupCountdown && countdownDisplay !== null ? countdownDisplay : displayTime;
   const progress = isSetupCountdown 
     ? 0 
     : isPaused
-    ? ((totalDuration - displayTime) / totalDuration) * 100
-    : ((totalDuration - displayTime) / totalDuration) * 100;
+    ? ((totalDuration - showTime) / totalDuration) * 100
+    : ((totalDuration - showTime) / totalDuration) * 100;
 
   const displayLabel = isPaused
     ? "Paused"
@@ -36,7 +39,7 @@ export function Timer({
   return (
     <div className="flex flex-col items-center w-full max-w-xs">
       <motion.div
-        key={displayTime}
+        key={showTime}
         initial={isTransitionCountdown ? { scale: 1.1, opacity: 0.8 } : {}}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
@@ -50,7 +53,7 @@ export function Timer({
             : "text-gray-800 dark:text-gray-100"
         }`}
       >
-        {displayTime}
+        {showTime}
       </motion.div>
       <div className="mt-2 text-sm font-medium text-gray-400">
         {displayLabel}
