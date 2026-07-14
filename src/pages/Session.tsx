@@ -188,6 +188,7 @@ export function Session() {
           isPaused={isPaused}
           setupCountdown={setupCountdown}
           transitionCountdown={transitionCountdown}
+          totalDuration={currentExercise.duration}
         />
       </div>
 

@@ -6,6 +6,7 @@ interface TimerProps {
   isPaused: boolean;
   setupCountdown?: number | null;
   transitionCountdown?: number | null;
+  totalDuration?: number;
 }
 
 export function Timer({
@@ -14,11 +15,29 @@ export function Timer({
   isPaused,
   setupCountdown,
   transitionCountdown,
+  totalDuration = 60,
 }: TimerProps) {
   const displayTime = setupCountdown ?? transitionCountdown ?? timeLeft;
   const isSetupCountdown = setupCountdown !== null;
   const isTransitionCountdown = transitionCountdown !== null;
-  const isCountdown = isSetupCountdown || isTransitionCountdown;
+
+  const progress = isSetupCountdown 
+    ? 0 
+    : isPaused
+    ? ((totalDuration - timeLeft) / totalDuration) * 100
+    : isTransitionCountdown
+    ? 100
+    : ((totalDuration - timeLeft) / totalDuration) * 100;
+
+  const displayLabel = isPaused
+    ? "Paused"
+    : isSetupCountdown
+    ? "Get Ready"
+    : isTransitionCountdown
+    ? "DONE"
+    : isRunning
+    ? "Running"
+    : "Ready";
 
   return (
     <div className="flex flex-col items-center w-full max-w-xs">
@@ -40,29 +59,18 @@ export function Timer({
         {displayTime}
       </motion.div>
       <div className="mt-2 text-sm font-medium text-gray-400">
-        {isPaused
-          ? "Paused"
-          : isSetupCountdown
-          ? "Get Ready"
-          : isTransitionCountdown
-          ? "Almost Done"
-          : isRunning
-          ? "Running"
-          : "Ready"}
+        {displayLabel}
       </div>
-      {isTransitionCountdown && (
-        <div className="mt-4 w-full">
-          <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <motion.div
-              key={displayTime}
-              className="h-full bg-primary-500"
-              initial={{ width: "100%" }}
-              animate={{ width: "0%" }}
-              transition={{ duration: 3, ease: "linear" }}
-            />
-          </div>
+      <div className="mt-4 w-full">
+        <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-primary-500"
+            initial={{ width: `${progress}%` }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          />
         </div>
-      )}
+      </div>
     </div>
   );
 }
