@@ -73,6 +73,7 @@ export function Session() {
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
   useEffect(() => {
+    console.log('[Session] currentExercise changed:', currentExercise.title);
     setWaitingForStart(true);
     setTransitionCountdown(null);
     setShowNextPreview(false);
