@@ -84,8 +84,10 @@ export function Session() {
   }, [currentExercise, resetTimer]);
 
   useEffect(() => {
+    console.log('[Session] setupCountdown changed:', setupCountdown);
     if (setupCountdown === 1) {
       const timer = setTimeout(() => {
+        console.log('[Session] Calling start() after countdown');
         setSetupCountdown(null);
         start();
       }, 1000);

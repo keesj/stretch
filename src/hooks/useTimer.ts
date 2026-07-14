@@ -40,6 +40,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   }, [timeLeft, isRunning, onComplete]);
 
   const start = useCallback(() => {
+    console.log('[useTimer] start() called');
     setIsRunning(true);
     setIsPaused(false);
   }, []);
