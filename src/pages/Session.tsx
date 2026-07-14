@@ -60,9 +60,15 @@ export function Session() {
     onComplete: nextExercise,
   });
 
-  console.log('[Session] Timer initialized, currentExercise:', currentExercise.title, 'duration:', currentExercise.duration, 'timeLeft:', timeLeft);
-
   const [showNextPreview, setShowNextPreview] = useState(false);
+
+  useEffect(() => {
+    console.log('[Session] currentExercise changed:', currentExercise.title, 'duration:', currentExercise.duration);
+    resetTimer(currentExercise.duration);
+    setWaitingForStart(true);
+    setTransitionCountdown(null);
+    setShowNextPreview(false);
+  }, [currentExercise, resetTimer]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 3 && currentExerciseIndex < totalExercises - 1) {
@@ -73,13 +79,6 @@ export function Session() {
       setTransitionCountdown(null);
     }
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
-
-  useEffect(() => {
-    console.log('[Session] currentExercise changed:', currentExercise.title);
-    setWaitingForStart(true);
-    setTransitionCountdown(null);
-    setShowNextPreview(false);
-  }, [currentExercise]);
 
   const handleSkip = () => {
     skip();
