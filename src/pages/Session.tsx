@@ -53,36 +53,12 @@ export function Session() {
 
   const [setupCountdown, setSetupCountdown] = useState<number | null>(null);
   const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
+  const [waitingForStart, setWaitingForStart] = useState(false);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
     onComplete: nextExercise,
   });
-
-  const [exerciseStarted, setExerciseStarted] = useState(false);
-
-  useEffect(() => {
-    setExerciseStarted(false);
-    setSetupCountdown(3);
-    const timer = setInterval(() => {
-      setSetupCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer);
-          setSetupCountdown(null);
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentExercise]);
-
-  useEffect(() => {
-    if (!isPaused && !isCompleted && exerciseStarted) {
-      start();
-    }
-  }, [exerciseStarted, isPaused, isCompleted, start]);
 
   const [showNextPreview, setShowNextPreview] = useState(false);
 
@@ -95,6 +71,10 @@ export function Session() {
       setTransitionCountdown(null);
     }
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
+
+  useEffect(() => {
+    setWaitingForStart(true);
+  }, [currentExercise]);
 
   const handleSkip = () => {
     skip();
@@ -236,10 +216,25 @@ export function Session() {
         </Button>
 
         <Button
-          variant={!exerciseStarted || isPaused ? "primary" : "secondary"}
+          variant={setupCountdown !== null || isPaused ? "primary" : "secondary"}
           onClick={() => {
-            if (!exerciseStarted) {
-              setExerciseStarted(true);
+            if (setupCountdown !== null) {
+              return;
+            }
+            if (waitingForStart) {
+              setSetupCountdown(3);
+              setWaitingForStart(false);
+              const timer = setInterval(() => {
+                setSetupCountdown((prev) => {
+                  if (prev === null || prev <= 1) {
+                    clearInterval(timer);
+                    setSetupCountdown(null);
+                    start();
+                    return null;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
             } else if (isPaused) {
               start();
             } else {
@@ -248,7 +243,7 @@ export function Session() {
           }}
           className="flex-1"
         >
-          {!exerciseStarted ? "Start" : isPaused ? "Resume" : "Pause"}
+          {setupCountdown !== null ? setupCountdown : waitingForStart ? "Start" : isPaused ? "Resume" : "Pause"}
         </Button>
 
         <Button onClick={handleSkip} className="flex-1">
