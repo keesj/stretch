@@ -55,7 +55,9 @@ export function Session() {
   const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
   const [waitingForStart, setWaitingForStart] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
-  const [autoStarted, setAutoStarted] = useState(false);
+
+  const isSetupCountdown = setupCountdown !== null;
+  const isTransitionCountdown = transitionCountdown !== null;
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
@@ -68,29 +70,10 @@ export function Session() {
     console.log('[Session] currentExercise changed:', currentExercise.title, 'duration:', currentExercise.duration);
     resetTimer(currentExercise.duration);
     setWaitingForStart(true);
-    setAutoStarted(false);
     setTransitionCountdown(null);
     setShowNextPreview(false);
     setSetupCountdown(null);
-
-    if (!autoStarted) {
-      setSetupCountdown(3);
-      setWaitingForStart(false);
-      setAutoStarted(true);
-      const timer = setInterval(() => {
-        setSetupCountdown((prev) => {
-          if (prev === null || prev <= 1) {
-            clearInterval(timer);
-            setSetupCountdown(null);
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [currentExercise, resetTimer, autoStarted]);
+  }, [currentExercise, resetTimer]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
@@ -98,7 +81,6 @@ export function Session() {
       setTransitionCountdown(timeLeft);
     } else {
       setShowNextPreview(false);
-      setTransitionCountdown(null);
     }
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
@@ -187,11 +169,11 @@ export function Session() {
 
       <div className="my-8">
         <Timer
-          timeLeft={timeLeft}
+          displayTime={isSetupCountdown ? currentExercise.duration : (transitionCountdown ?? timeLeft)}
           isRunning={isRunning}
           isPaused={isPaused}
-          setupCountdown={setupCountdown}
-          transitionCountdown={transitionCountdown}
+          isSetupCountdown={isSetupCountdown}
+          isTransitionCountdown={isTransitionCountdown}
           totalDuration={currentExercise.duration}
         />
       </div>
@@ -259,20 +241,20 @@ export function Session() {
         </Button>
 
         <Button
-          variant={setupCountdown !== null || isPaused ? "primary" : "secondary"}
+          variant={isSetupCountdown || isPaused ? "primary" : "secondary"}
           onClick={() => {
-            if (setupCountdown !== null) {
+            if (isSetupCountdown) {
               return;
             }
-            if (waitingForStart && !autoStarted) {
-              setSetupCountdown(currentExercise.duration);
+            if (waitingForStart) {
+              setSetupCountdown(3);
               setWaitingForStart(false);
-              setAutoStarted(true);
               const timer = setInterval(() => {
                 setSetupCountdown((prev) => {
                   if (prev === null || prev <= 1) {
                     clearInterval(timer);
                     setSetupCountdown(null);
+                    start();
                     return null;
                   }
                   return prev - 1;
@@ -286,7 +268,13 @@ export function Session() {
           }}
           className="flex-1"
         >
-          {setupCountdown !== null ? `${currentExercise.duration} + ${setupCountdown}` : waitingForStart ? "Start" : isPaused ? "Resume" : "Pause"}
+          {isSetupCountdown 
+            ? `${currentExercise.duration} + ${setupCountdown}` 
+            : waitingForStart 
+            ? "Start" 
+            : isPaused 
+            ? "Resume" 
+            : "Pause"}
         </Button>
 
         <Button onClick={handleSkip} className="flex-1">

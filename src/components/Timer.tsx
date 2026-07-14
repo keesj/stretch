@@ -1,31 +1,27 @@
 import { motion } from "framer-motion";
 
 interface TimerProps {
-  timeLeft: number;
+  displayTime: number;
   isRunning: boolean;
   isPaused: boolean;
-  setupCountdown?: number | null;
-  transitionCountdown?: number | null;
+  isSetupCountdown?: boolean;
+  isTransitionCountdown?: boolean;
   totalDuration?: number;
 }
 
 export function Timer({
-  timeLeft,
+  displayTime,
   isRunning,
   isPaused,
-  setupCountdown,
-  transitionCountdown,
+  isSetupCountdown = false,
+  isTransitionCountdown = false,
   totalDuration = 60,
 }: TimerProps) {
-  const isSetupCountdown = setupCountdown !== null;
-  const isTransitionCountdown = transitionCountdown !== null;
-  const displayTime = isSetupCountdown ? totalDuration : (transitionCountdown ?? timeLeft);
-
   const progress = isSetupCountdown 
     ? 0 
     : isPaused
-    ? ((totalDuration - timeLeft) / totalDuration) * 100
-    : ((totalDuration - timeLeft) / totalDuration) * 100;
+    ? ((totalDuration - displayTime) / totalDuration) * 100
+    : ((totalDuration - displayTime) / totalDuration) * 100;
 
   const displayLabel = isPaused
     ? "Paused"
