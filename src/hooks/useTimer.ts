@@ -12,10 +12,13 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   const intervalRef = useRef<number | null>(null);
 
   const countdown = useCallback(() => {
-    if (timeLeft > 0) {
-      setTimeLeft((prev) => prev - 1);
-    }
-  }, [timeLeft]);
+    setTimeLeft((prev) => {
+      if (prev > 0) {
+        return prev - 1;
+      }
+      return prev;
+    });
+  }, []);
 
   useEffect(() => {
     if (isRunning && !isPaused && timeLeft > 0) {
@@ -27,7 +30,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, isPaused, countdown]);
+  }, [isRunning, isPaused]);
 
   useEffect(() => {
     if (timeLeft === 0 && isRunning && onComplete) {

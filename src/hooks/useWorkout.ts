@@ -19,6 +19,11 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const currentExerciseIndexRef = useRef(0);
+
+  useEffect(() => {
+    currentExerciseIndexRef.current = currentExerciseIndex;
+  }, [currentExerciseIndex]);
 
   const currentExercise = stretches[currentExerciseIndex];
   const totalExercises = routine.stretches.length;
@@ -48,23 +53,6 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     };
   }, [isPaused, isCompleted, startTimer, stopTimer]);
 
-  const nextExercise = useCallback(() => {
-    if (currentExerciseIndex < totalExercises - 1) {
-      setCurrentExerciseIndex((prev) => prev + 1);
-    } else {
-      finishWorkout();
-    }
-  }, [currentExerciseIndex, totalExercises]);
-
-  const previousExercise = useCallback(() => {
-    setCurrentExerciseIndex((prev) => {
-      if (prev > 0) {
-        return prev - 1;
-      }
-      return prev;
-    });
-  }, []);
-
   const finishWorkout = useCallback(() => {
     stopTimer();
     setIsCompleted(true);
@@ -88,6 +76,26 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
       onComplete(completedSession);
     }
   }, [stopTimer, routine, elapsedSeconds, onComplete]);
+
+  const nextExercise = useCallback(() => {
+    setCurrentExerciseIndex((prev) => {
+      const newIndex = prev + 1;
+      if (newIndex >= totalExercises) {
+        finishWorkout();
+        return prev;
+      }
+      return newIndex;
+    });
+  }, [totalExercises, finishWorkout]);
+
+  const previousExercise = useCallback(() => {
+    setCurrentExerciseIndex((prev) => {
+      if (prev > 0) {
+        return prev - 1;
+      }
+      return prev;
+    });
+  }, []);
 
   const reset = useCallback(() => {
     setCurrentExerciseIndex(0);
