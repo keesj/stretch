@@ -34,6 +34,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
 
   useEffect(() => {
     if (timeLeft === 0 && isRunning && onComplete) {
+      console.log('[useTimer] timeLeft === 0, isRunning:', isRunning, 'calling onComplete');
       onComplete();
     }
   }, [timeLeft, isRunning, onComplete]);

@@ -61,8 +61,16 @@ export function Session() {
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
-    onComplete: nextExercise,
+    onComplete: () => {
+      console.log('[Session] Timer complete, calling nextExercise');
+      console.log('[Session] isRunning:', isRunning, 'timeLeft:', timeLeft);
+      nextExercise();
+    },
   });
+
+  useEffect(() => {
+    console.log('[Session] Timer state:', { timeLeft, isRunning, isPaused, setupCountdown, showStartButton });
+  }, [timeLeft, isRunning, isPaused, setupCountdown, showStartButton]);
 
   const [showNextPreview, setShowNextPreview] = useState(false);
 
@@ -74,6 +82,16 @@ export function Session() {
     setSetupCountdown(null);
     setShowStartButton(true);
   }, [currentExercise, resetTimer]);
+
+  useEffect(() => {
+    if (setupCountdown === 1) {
+      const timer = setTimeout(() => {
+        setSetupCountdown(null);
+        start();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [setupCountdown, start]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
