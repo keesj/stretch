@@ -72,7 +72,7 @@ export function Session() {
   }, [currentExercise, resetTimer]);
 
   useEffect(() => {
-    if (!isPaused && !isCompleted && timeLeft <= 3 && currentExerciseIndex < totalExercises - 1) {
+    if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
       setShowNextPreview(true);
       setTransitionCountdown(timeLeft);
     } else {
@@ -164,6 +164,17 @@ export function Session() {
         </motion.div>
       </AnimatePresence>
 
+      <div className="my-8">
+        <Timer
+          timeLeft={timeLeft}
+          isRunning={isRunning}
+          isPaused={isPaused}
+          setupCountdown={setupCountdown}
+          transitionCountdown={transitionCountdown}
+          totalDuration={currentExercise.duration}
+        />
+      </div>
+
       {showNextPreview && currentExerciseIndex < totalExercises - 1 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -185,17 +196,6 @@ export function Session() {
           </Card>
         </motion.div>
       )}
-
-      <div className="my-8">
-        <Timer
-          timeLeft={timeLeft}
-          isRunning={isRunning}
-          isPaused={isPaused}
-          setupCountdown={setupCountdown}
-          transitionCountdown={transitionCountdown}
-          totalDuration={currentExercise.duration}
-        />
-      </div>
 
       <button
         onClick={() => setShowInstructions(!showInstructions)}
