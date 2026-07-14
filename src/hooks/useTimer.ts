@@ -34,7 +34,6 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
 
   useEffect(() => {
     if (timeLeft === 0 && isRunning && onComplete) {
-      console.log('[useTimer] timeLeft === 0, calling onComplete');
       onComplete();
     }
   }, [timeLeft, isRunning, onComplete]);
@@ -64,7 +63,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   );
 
   const skip = useCallback(() => {
-    setTimeLeft(0);
+    // Skip doesn't trigger onComplete, caller must call nextExercise()
   }, []);
 
   return {

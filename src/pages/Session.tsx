@@ -83,6 +83,7 @@ export function Session() {
 
   const handleSkip = () => {
     skip();
+    nextExercise();
   };
 
   const handlePrevious = () => {
