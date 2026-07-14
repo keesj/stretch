@@ -54,7 +54,7 @@ export function Session() {
   const [setupCountdown, setSetupCountdown] = useState<number | null>(null);
   const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
   const [waitingForStart, setWaitingForStart] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
