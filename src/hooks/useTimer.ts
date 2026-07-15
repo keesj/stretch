@@ -28,6 +28,12 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
           return prev - 1;
         });
       }, 1000);
+    } else {
+      // Clear interval when timer reaches 0 to prevent duplicate onComplete calls
+      if (intervalRef.current && timeLeft === 0) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     }
 
     return () => {
@@ -35,7 +41,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning]);
+  }, [isRunning, timeLeft]);
 
   const start = useCallback(() => {
     setIsRunning(true);
