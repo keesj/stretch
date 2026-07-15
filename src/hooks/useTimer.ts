@@ -10,6 +10,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   const [isRunning, setIsRunning] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const onCompleteRef = useRef(onComplete);
+  const hasCompletedRef = useRef(false);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -19,29 +20,31 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
     if (isRunning && timeLeft > 0) {
       intervalRef.current = setInterval(() => {
         setTimeLeft((prev) => {
-          if (prev <= 1) {
+          if (prev <= 1 && !hasCompletedRef.current) {
+            hasCompletedRef.current = true;
             if (onCompleteRef.current) {
               onCompleteRef.current();
+            }
+          }
+          if (prev <= 1) {
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
             }
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
-    } else {
-      // Clear interval when timer reaches 0 to prevent duplicate onComplete calls
-      if (intervalRef.current && timeLeft === 0) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     }
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [isRunning, timeLeft]);
+  }, [isRunning]);
 
   const start = useCallback(() => {
     setIsRunning(true);
@@ -55,6 +58,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
     (newTime?: number) => {
       setIsRunning(false);
       setTimeLeft(newTime ?? initialTime);
+      hasCompletedRef.current = false;
     },
     [initialTime]
   );
