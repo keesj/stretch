@@ -53,43 +53,19 @@ export function Session() {
 
   const [showInstructions, setShowInstructions] = useState(false);
   const [showNextPreview, setShowNextPreview] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
-    onComplete: () => {
-      setCountdown(null);
-      nextExercise();
-    },
+    onComplete: () => nextExercise(),
   });
 
   useEffect(() => {
-    if (countdown === null) {
-      resetTimer(currentExercise.duration);
-    }
+    resetTimer(currentExercise.duration);
     if (currentExerciseIndex === 0) {
-      setCountdown(null);
-    } else if (countdown === null && isRunning === false && isPaused === false) {
-      setCountdown(3);
+    } else {
+      start();
     }
-  }, [currentExercise, resetTimer, currentExerciseIndex, isRunning, isPaused, countdown]);
-
-  useEffect(() => {
-    if (countdown !== null && countdown > 0) {
-      if (countdown === 1) {
-        const timer = setTimeout(() => {
-          setCountdown(null);
-          start();
-        }, 1000);
-        return () => clearTimeout(timer);
-      } else {
-        const timer = setTimeout(() => {
-          setCountdown((prev) => (prev !== null ? prev - 1 : null));
-        }, 1000);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [countdown, start]);
+  }, [currentExercise, resetTimer, currentExerciseIndex]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
@@ -188,8 +164,7 @@ export function Session() {
           isRunning={isRunning}
           isPaused={isPaused}
           totalDuration={currentExercise.duration}
-          countdownDisplay={countdown !== null ? countdown : (showNextPreview ? timeLeft : null)}
-          isSetupCountdown={countdown !== null}
+          countdownDisplay={showNextPreview ? timeLeft : null}
         />
       </div>
 
@@ -261,7 +236,7 @@ export function Session() {
             if (isRunning) {
               pause();
             } else {
-              setCountdown(3);
+              start();
             }
           }}
           className="flex-1"
