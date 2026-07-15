@@ -64,13 +64,15 @@ export function Session() {
   });
 
   useEffect(() => {
-    resetTimer(currentExercise.duration);
+    if (countdown === null) {
+      resetTimer(currentExercise.duration);
+    }
     if (currentExerciseIndex === 0) {
       setCountdown(null);
     } else if (countdown === null && isRunning === false && isPaused === false) {
       setCountdown(3);
     }
-  }, [currentExercise, resetTimer, currentExerciseIndex, isRunning, isPaused]);
+  }, [currentExercise, resetTimer, currentExerciseIndex, isRunning, isPaused, countdown]);
 
   useEffect(() => {
     if (countdown !== null && countdown > 0) {
