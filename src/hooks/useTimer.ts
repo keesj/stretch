@@ -44,7 +44,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
         intervalRef.current = null;
       }
     };
-  }, [isRunning]);
+  }, [isRunning, timeLeft]);
 
   const start = useCallback(() => {
     setIsRunning(true);

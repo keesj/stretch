@@ -55,7 +55,7 @@ describe('Session timer and workout flow', () => {
 
     it('should start setup countdown when Start button is clicked', () => {
       const onComplete = vi.fn();
-      const { result: workoutResult } = renderHook(() => 
+      const { result: _workoutResult } = renderHook(() => 
         useWorkout({
           routine: mockRoutine,
           stretches: mockStretches,
@@ -127,7 +127,7 @@ describe('Session timer and workout flow', () => {
 
     it('should handle pause and resume', () => {
       const onComplete = vi.fn();
-      const { result: workoutResult } = renderHook(() => 
+      const { result: _workoutResult } = renderHook(() => 
         useWorkout({
           routine: mockRoutine,
           stretches: mockStretches,

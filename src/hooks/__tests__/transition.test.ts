@@ -1,5 +1,4 @@
 import { renderHook, act } from '@testing-library/react';
-import { useTimer } from '../useTimer';
 import { useWorkout } from '../useWorkout';
 
 describe('Exercise transition flow', () => {
@@ -32,7 +31,7 @@ describe('Exercise transition flow', () => {
   ];
 
   it('should transition exercises when timer completes', () => {
-    let onCompleteCallback: (() => void) | null = null;
+    let _onCompleteCallback: (() => void) | null = null;
 
     const { result: workoutResult } = renderHook(() => 
       useWorkout({

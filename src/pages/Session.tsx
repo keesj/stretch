@@ -65,7 +65,7 @@ export function Session() {
     } else {
       start();
     }
-  }, [currentExercise, resetTimer, currentExerciseIndex]);
+  }, [currentExercise, resetTimer, currentExerciseIndex, start]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
