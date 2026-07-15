@@ -4,59 +4,55 @@ interface TimerProps {
   displayTime: number;
   isRunning: boolean;
   isPaused: boolean;
-  isSetupCountdown?: boolean;
-  isTransitionCountdown?: boolean;
   totalDuration?: number;
   countdownDisplay?: number | null;
+  isSetupCountdown?: boolean;
 }
 
 export function Timer({
   displayTime,
   isRunning,
   isPaused,
-  isSetupCountdown = false,
-  isTransitionCountdown = false,
   totalDuration = 60,
   countdownDisplay = null,
+  isSetupCountdown = false,
 }: TimerProps) {
-  // Show dots during setup countdown
-  const displayText = isSetupCountdown && countdownDisplay !== null && countdownDisplay > 0
-    ? `${totalDuration}${'.'.repeat(4 - countdownDisplay)}`
-    : countdownDisplay !== null
+  const isTransition = countdownDisplay !== null && !isSetupCountdown;
+  
+  const displayText = isSetupCountdown
+    ? `${totalDuration}${'.'.repeat(4 - countdownDisplay!)} `
+    : isTransition
     ? countdownDisplay
     : displayTime;
-  const progress = isSetupCountdown 
-    ? 0 
-    : isPaused
-    ? ((totalDuration - (countdownDisplay !== null ? countdownDisplay : displayTime)) / totalDuration) * 100
-    : ((totalDuration - (countdownDisplay !== null ? countdownDisplay : displayTime)) / totalDuration) * 100;
+  
+  const progress = ((totalDuration - displayTime) / totalDuration) * 100;
 
   const displayLabel = isPaused
     ? "Paused"
     : isSetupCountdown
     ? "Get Ready"
-    : isTransitionCountdown
+    : isTransition
     ? "DONE"
     : isRunning
     ? "Running"
     : "Ready";
 
+  const textStyle = isSetupCountdown
+    ? "text-primary-400"
+    : isTransition
+    ? "text-primary-500"
+    : isPaused
+    ? "text-primary-400"
+    : "text-gray-800 dark:text-gray-100";
+
   return (
     <div className="flex flex-col items-center w-full max-w-xs">
       <motion.div
         key={displayText}
-        initial={isTransitionCountdown ? { scale: 1.1, opacity: 0.8 } : {}}
+        initial={{ scale: 1.1, opacity: 0.8 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className={`text-6xl font-light ${
-          isTransitionCountdown
-            ? "text-primary-500"
-            : isSetupCountdown
-            ? "text-primary-400"
-            : isPaused
-            ? "text-primary-400"
-            : "text-gray-800 dark:text-gray-100"
-        }`}
+        className={`text-6xl font-light ${textStyle}`}
       >
         {displayText}
       </motion.div>

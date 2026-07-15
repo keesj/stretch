@@ -89,7 +89,7 @@ describe('Comprehensive exercise transition tests', () => {
         result.current.pause();
       });
 
-      expect(result.current.isPaused).toBe(true);
+      expect(result.current.isRunning).toBe(false);
       expect(result.current.timeLeft).toBe(5);
 
       act(() => {

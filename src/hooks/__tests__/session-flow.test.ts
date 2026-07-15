@@ -162,7 +162,7 @@ describe('Session timer and workout flow', () => {
       act(() => {
         timerResult.current.pause();
       });
-      expect(timerResult.current.isPaused).toBe(true);
+      expect(timerResult.current.isRunning).toBe(false);
 
       // Advance time while paused
       act(() => {

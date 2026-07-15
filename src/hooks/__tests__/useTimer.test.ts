@@ -15,7 +15,6 @@ describe('useTimer', () => {
 
     expect(result.current.timeLeft).toBe(60);
     expect(result.current.isRunning).toBe(false);
-    expect(result.current.isPaused).toBe(false);
   });
 
   it('starts the timer when start() is called', () => {
@@ -26,7 +25,6 @@ describe('useTimer', () => {
     });
 
     expect(result.current.isRunning).toBe(true);
-    expect(result.current.isPaused).toBe(false);
   });
 
   it('pauses the timer when pause() is called', () => {
@@ -38,7 +36,6 @@ describe('useTimer', () => {
     });
 
     expect(result.current.isRunning).toBe(false);
-    expect(result.current.isPaused).toBe(true);
   });
 
   it('resumes the timer when start() is called after pause', () => {
@@ -51,7 +48,6 @@ describe('useTimer', () => {
     });
 
     expect(result.current.isRunning).toBe(true);
-    expect(result.current.isPaused).toBe(false);
   });
 
   it('decrements timeLeft when timer is running', () => {
@@ -79,7 +75,6 @@ describe('useTimer', () => {
 
     expect(result.current.timeLeft).toBe(60);
     expect(result.current.isRunning).toBe(false);
-    expect(result.current.isPaused).toBe(false);
   });
 
   it('resets to new time when reset() is called with argument', () => {

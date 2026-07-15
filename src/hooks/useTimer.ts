@@ -8,21 +8,26 @@ interface UseTimerOptions {
 export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   const [timeLeft, setTimeLeft] = useState(initialTime);
   const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<number | null>(null);
-
-  const countdown = useCallback(() => {
-    setTimeLeft((prev) => {
-      if (prev > 0) {
-        return prev - 1;
-      }
-      return prev;
-    });
-  }, []);
+  const onCompleteRef = useRef(onComplete);
 
   useEffect(() => {
-    if (isRunning && !isPaused && timeLeft > 0) {
-      intervalRef.current = setInterval(countdown, 1000);
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    if (isRunning && timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
 
     return () => {
@@ -30,35 +35,19 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, isPaused]);
-
-  useEffect(() => {
-    if (timeLeft === 0 && isRunning && onComplete) {
-      console.log('[useTimer] timeLeft === 0, isRunning:', isRunning, 'calling onComplete');
-      onComplete();
-    }
-  }, [timeLeft, isRunning, onComplete]);
+  }, [isRunning]);
 
   const start = useCallback(() => {
-    console.log('[useTimer] start() called');
     setIsRunning(true);
-    setIsPaused(false);
   }, []);
 
   const pause = useCallback(() => {
-    setIsPaused(true);
     setIsRunning(false);
-  }, []);
-
-  const resume = useCallback(() => {
-    setIsRunning(true);
-    setIsPaused(false);
   }, []);
 
   const reset = useCallback(
     (newTime?: number) => {
       setIsRunning(false);
-      setIsPaused(false);
       setTimeLeft(newTime ?? initialTime);
     },
     [initialTime]
@@ -71,10 +60,8 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   return {
     timeLeft,
     isRunning,
-    isPaused,
     start,
     pause,
-    resume,
     reset,
     skip,
   };

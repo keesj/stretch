@@ -66,7 +66,7 @@ describe('Timer setup countdown and auto-start', () => {
         result.current.pause();
       });
 
-      expect(result.current.isPaused).toBe(true);
+      expect(result.current.isRunning).toBe(false);
 
       act(() => {
         vi.advanceTimersByTime(5000);
