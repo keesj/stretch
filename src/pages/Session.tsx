@@ -53,24 +53,24 @@ export function Session() {
 
   const [showInstructions, setShowInstructions] = useState(false);
   const [showNextPreview, setShowNextPreview] = useState(false);
-  const [shouldAutoStart, setShouldAutoStart] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
-    onComplete: () => nextExercise(),
+    onComplete: () => {
+      setCountdown(null);
+      nextExercise();
+    },
   });
 
   useEffect(() => {
     resetTimer(currentExercise.duration);
     if (currentExerciseIndex === 0) {
-      setShouldAutoStart(false);
       setCountdown(null);
-    } else {
-      setShouldAutoStart(true);
-      setCountdown(null);
+    } else if (countdown === null && isRunning === false && isPaused === false) {
+      setCountdown(3);
     }
-  }, [currentExercise, resetTimer, currentExerciseIndex]);
+  }, [currentExercise, resetTimer, currentExerciseIndex, isRunning, isPaused]);
 
   useEffect(() => {
     if (countdown !== null && countdown > 0) {
@@ -87,13 +87,7 @@ export function Session() {
         return () => clearTimeout(timer);
       }
     }
-  }, [countdown]);
-
-  useEffect(() => {
-    if (shouldAutoStart && currentExerciseIndex > 0 && !isRunning && !countdown) {
-      setCountdown(3);
-    }
-  }, [shouldAutoStart, currentExerciseIndex, isRunning, countdown]);
+  }, [countdown, start]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
@@ -105,13 +99,11 @@ export function Session() {
 
   const handleSkip = () => {
     skip();
-    setShouldAutoStart(false);
     nextExercise();
   };
 
   const handlePrevious = () => {
     if (currentExerciseIndex > 0) {
-      setShouldAutoStart(false);
       previousExercise();
     }
   };
