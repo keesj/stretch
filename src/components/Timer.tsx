@@ -7,6 +7,7 @@ interface TimerProps {
   totalDuration?: number;
   countdownDisplay?: number | null;
   isSetupCountdown?: boolean;
+  isTransitionMessage?: boolean;
 }
 
 export function Timer({
@@ -16,13 +17,14 @@ export function Timer({
   totalDuration = 60,
   countdownDisplay = null,
   isSetupCountdown = false,
+  isTransitionMessage = false,
 }: TimerProps) {
-  const isTransition = countdownDisplay !== null && !isSetupCountdown;
+  const isTransition = isTransitionMessage;
   
   const displayText = isSetupCountdown
     ? `${totalDuration}${'.'.repeat(4 - countdownDisplay!)} `
     : isTransition
-    ? countdownDisplay
+    ? countdownDisplay ?? displayTime
     : displayTime;
   
   const progress = ((totalDuration - displayTime) / totalDuration) * 100;
@@ -32,7 +34,7 @@ export function Timer({
     : isSetupCountdown
     ? "Get Ready"
     : isTransition
-    ? "DONE"
+    ? "Almost Done"
     : isRunning
     ? "Running"
     : "Ready";
@@ -40,7 +42,7 @@ export function Timer({
   const textStyle = isSetupCountdown
     ? "text-primary-400"
     : isTransition
-    ? "text-primary-500"
+    ? "text-primary-600"
     : isPaused
     ? "text-primary-400"
     : "text-gray-800 dark:text-gray-100";

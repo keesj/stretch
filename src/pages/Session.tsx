@@ -53,6 +53,7 @@ export function Session() {
 
   const [showInstructions, setShowInstructions] = useState(false);
   const [showNextPreview, setShowNextPreview] = useState(false);
+  const [showTransitionMessage, setShowTransitionMessage] = useState(false);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
@@ -68,7 +69,15 @@ export function Session() {
   }, [currentExercise, resetTimer, currentExerciseIndex, start]);
 
   useEffect(() => {
-    if (!isPaused && !isCompleted && timeLeft <= 10 && currentExerciseIndex < totalExercises - 1) {
+    if (!isPaused && !isCompleted && timeLeft <= 8 && currentExerciseIndex < totalExercises - 1) {
+      setShowTransitionMessage(true);
+    } else {
+      setShowTransitionMessage(false);
+    }
+  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
+
+  useEffect(() => {
+    if (!isPaused && !isCompleted && timeLeft <= 3 && currentExerciseIndex < totalExercises - 1) {
       setShowNextPreview(true);
     } else {
       setShowNextPreview(false);
@@ -165,6 +174,7 @@ export function Session() {
           isPaused={isPaused}
           totalDuration={currentExercise.duration}
           countdownDisplay={showNextPreview ? timeLeft : null}
+          isTransitionMessage={showTransitionMessage}
         />
       </div>
 
