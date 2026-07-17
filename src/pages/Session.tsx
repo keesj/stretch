@@ -68,7 +68,7 @@ export function Session() {
   const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
   const countdownCompleteRef = useRef(false);
 
-  // Reset countdown when exercise changes
+  // Reset countdown and timer when exercise changes
   useEffect(() => {
     if (countdownTimersRef.current) {
       countdownTimersRef.current.forEach(clearTimeout);
@@ -77,7 +77,12 @@ export function Session() {
     setCountdownState("idle");
     resetTimer(currentExercise.duration);
     countdownCompleteRef.current = false;
-  }, [currentExercise, resetTimer]);
+
+    // Auto-start timer for all exercises except the first one
+    if (currentExerciseIndex > 0 && !isCompleted) {
+      start();
+    }
+  }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, start]);
 
   // Countdown: 3 beeps at 0s, 1s, 2s then start timer at 3s
   const startCountdown = useCallback(() => {
