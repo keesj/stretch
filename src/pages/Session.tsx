@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { useTimer } from "../hooks/useTimer";
 import { useWorkout } from "../hooks/useWorkout";
 import { useBeep } from "../hooks/useBeep";
+import { useWakeLock } from "../hooks/useWakeLock";
 import { Card } from "../components/Card";
 import type { Stretch } from "../types/stretch";
 import type { Routine } from "../types/routine";
@@ -63,6 +64,8 @@ export function Session() {
       nextExercise();
     },
   });
+
+  useWakeLock({ isActive: isRunning && !isPaused });
 
   const playBeep = useBeep(true);
   const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
