@@ -78,11 +78,11 @@ export function Session() {
     resetTimer(currentExercise.duration);
     countdownCompleteRef.current = false;
 
-    // Auto-start timer for all exercises except the first one
+    // Auto-start countdown for all exercises except the first one
     if (currentExerciseIndex > 0 && !isCompleted) {
-      start();
+      startCountdown();
     }
-  }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, start]);
+  }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, startCountdown]);
 
   // Countdown: 3 beeps at 0s, 1s, 2s then start timer at 3s
   const startCountdown = useCallback(() => {
@@ -144,10 +144,10 @@ export function Session() {
   const handleSkip = useCallback(() => {
     if (currentExerciseIndex < totalExercises - 1) {
       stopCountdown();
-      skip();
+      resetTimer(currentExercise.duration);
       startCountdown();
     }
-  }, [stopCountdown, skip, startCountdown, currentExerciseIndex, totalExercises]);
+  }, [stopCountdown, resetTimer, currentExercise, startCountdown, currentExerciseIndex, totalExercises]);
 
   const handlePrevious = useCallback(() => {
     stopCountdown();
