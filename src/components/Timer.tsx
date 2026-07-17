@@ -6,7 +6,6 @@ interface TimerProps {
   isPaused: boolean;
   totalDuration?: number;
   countdownDisplay?: number | null;
-  isSetupCountdown?: boolean;
   isTransitionMessage?: boolean;
 }
 
@@ -16,32 +15,25 @@ export function Timer({
   isPaused,
   totalDuration = 60,
   countdownDisplay = null,
-  isSetupCountdown = false,
   isTransitionMessage = false,
 }: TimerProps) {
   const isTransition = isTransitionMessage;
   
-  const displayText = isSetupCountdown
-    ? `${totalDuration}${'.'.repeat(4 - countdownDisplay!)} `
-    : isTransition
+  const displayText = isTransition
     ? countdownDisplay ?? displayTime
     : displayTime;
   
   const progress = ((totalDuration - displayTime) / totalDuration) * 100;
 
-  const displayLabel = isPaused
-    ? "Paused"
-    : isSetupCountdown
-    ? "Get Ready"
-    : isTransition
+  const displayLabel = isTransition
     ? "Almost Done"
+    : isPaused
+    ? "Paused"
     : isRunning
     ? "Running"
     : "Ready";
 
-  const textStyle = isSetupCountdown
-    ? "text-primary-400"
-    : isTransition
+  const textStyle = isTransition
     ? "text-primary-600"
     : isPaused
     ? "text-primary-400"

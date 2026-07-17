@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ExerciseCard } from "../components/ExerciseCard";
@@ -7,6 +7,7 @@ import { ProgressBar } from "../components/ProgressBar";
 import { Button } from "../components/Button";
 import { useTimer } from "../hooks/useTimer";
 import { useWorkout } from "../hooks/useWorkout";
+import { useBeep } from "../hooks/useBeep";
 import { Card } from "../components/Card";
 import type { Stretch } from "../types/stretch";
 import type { Routine } from "../types/routine";
@@ -54,19 +55,68 @@ export function Session() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showNextPreview, setShowNextPreview] = useState(false);
   const [showTransitionMessage, setShowTransitionMessage] = useState(false);
+  const [countdownState, setCountdownState] = useState<"idle" | "running" | "done">("idle");
+  const [manualStart, setManualStart] = useState(false);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
-    onComplete: () => nextExercise(),
+    onComplete: () => {
+      setManualStart(false);
+      nextExercise();
+    },
   });
 
+  const playBeep = useBeep(true);
+  const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
+  const shouldAutoStartRef = useRef(false);
+
+  // Reset countdown state when exercise changes
   useEffect(() => {
-    resetTimer(currentExercise.duration);
-    if (currentExerciseIndex === 0) {
-    } else {
-      start();
+    // Clear any pending timers
+    if (countdownTimersRef.current) {
+      countdownTimersRef.current.forEach(clearTimeout);
+      countdownTimersRef.current = null;
     }
-  }, [currentExercise, resetTimer, currentExerciseIndex, start]);
+    setCountdownState("idle");
+    setManualStart(false);
+    resetTimer(currentExercise.duration);
+  }, [currentExercise, resetTimer]);
+
+  // Countdown logic: 3 beeps, then start timer
+  useEffect(() => {
+    if (countdownState !== "running") return;
+
+    // Capture whether we should auto-start at the start of countdown
+    shouldAutoStartRef.current = !manualStart;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    // Beep #1 (at 0s)
+    playBeep(800, 0.1);
+
+    // Beep #2 (at 1s)
+    timers.push(setTimeout(() => playBeep(800, 0.1), 1000));
+
+    // Beep #3 (at 2s)
+    timers.push(setTimeout(() => playBeep(800, 0.1), 2000));
+
+    // Start timer (at 3s) - auto for subsequent exercises, wait for manual start
+    timers.push(setTimeout(() => {
+      if (shouldAutoStartRef.current) {
+        start();
+      }
+    }, 3000));
+
+    countdownTimersRef.current = timers;
+
+    return () => {
+      if (countdownTimersRef.current) {
+        countdownTimersRef.current.forEach(clearTimeout);
+        countdownTimersRef.current = null;
+      }
+    };
+
+  }, [countdownState, playBeep, start, manualStart]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 8 && currentExerciseIndex < totalExercises - 1) {
@@ -85,11 +135,15 @@ export function Session() {
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
   const handleSkip = () => {
+    setManualStart(false);
+    setCountdownState("idle");
     skip();
     nextExercise();
   };
 
   const handlePrevious = () => {
+    setManualStart(false);
+    setCountdownState("idle");
     if (currentExerciseIndex > 0) {
       previousExercise();
     }
@@ -246,7 +300,8 @@ export function Session() {
             if (isRunning) {
               pause();
             } else {
-              start();
+              setManualStart(true);
+              setCountdownState("running");
             }
           }}
           className="flex-1"
