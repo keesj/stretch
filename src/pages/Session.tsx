@@ -42,7 +42,6 @@ export function Session() {
     isPaused,
     elapsedSeconds,
     nextExercise,
-    previousExercise,
     reset,
   } = useWorkout({
     routine,
@@ -80,14 +79,12 @@ export function Session() {
     setCountdownState("idle");
     setManualStart(false);
     resetTimer(currentExercise.duration);
+    shouldAutoStartRef.current = false;
   }, [currentExercise, resetTimer]);
 
   // Countdown logic: 3 beeps, then start timer
   useEffect(() => {
     if (countdownState !== "running") return;
-
-    // Capture whether we should auto-start at the start of countdown
-    shouldAutoStartRef.current = !manualStart;
 
     const timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -102,7 +99,7 @@ export function Session() {
 
     // Start timer (at 3s) - auto for subsequent exercises, wait for manual start
     timers.push(setTimeout(() => {
-      if (shouldAutoStartRef.current) {
+      if (!manualStart && !isCompleted) {
         start();
       }
     }, 3000));
@@ -116,7 +113,7 @@ export function Session() {
       }
     };
 
-  }, [countdownState, playBeep, start, manualStart]);
+  }, [countdownState, playBeep, start, manualStart, isCompleted]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 8 && currentExerciseIndex < totalExercises - 1) {
@@ -138,14 +135,16 @@ export function Session() {
     setManualStart(false);
     setCountdownState("idle");
     skip();
-    nextExercise();
+    if (currentExerciseIndex < totalExercises - 1) {
+      nextExercise();
+    }
   };
 
   const handlePrevious = () => {
     setManualStart(false);
     setCountdownState("idle");
     if (currentExerciseIndex > 0) {
-      previousExercise();
+      nextExercise();
     }
   };
 

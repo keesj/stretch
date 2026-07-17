@@ -1,10 +1,9 @@
-import { StrictMode } from 'react'
+import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-// Handle dark mode based on system preference
-const handleDarkMode = () => {
+function applyTheme() {
   const settings = localStorage.getItem('settings');
   if (settings) {
     const { theme } = JSON.parse(settings);
@@ -16,15 +15,27 @@ const handleDarkMode = () => {
       root.classList.toggle('dark', theme === 'dark');
     }
   }
-};
+}
 
-handleDarkMode();
-
-// Listen for system theme changes
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', handleDarkMode);
+export function ThemeInitializer() {
+  useEffect(() => {
+    applyTheme();
+    
+    const handleDarkMode = () => {
+      applyTheme();
+    };
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', handleDarkMode);
+    
+    return () => {
+      mediaQuery.removeEventListener('change', handleDarkMode);
+    };
+  }, []);
+  
+  return null;
+}
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+  <App />
 )

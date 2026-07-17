@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import type { Routine } from "../types/routine";
@@ -18,12 +18,30 @@ export function Home() {
   const navigate = useNavigate();
   const [routines] = useState<Routine[]>(routinesData as Routine[]);
   const [stretches] = useState<Stretch[]>(stretchesData as Stretch[]);
-  const [completedSessions] = useState<CompletedSession[]>(() =>
-    loadFromStorage("completedSessions", [])
-  );
+  const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
+  const completedSessionsRef = useRef<CompletedSession[]>([]);
 
-  const totalSessions = completedSessions.length;
-  const totalMinutes = completedSessions.reduce((sum, s) => sum + s.duration, 0);
+  useEffect(() => {
+    const loadSessions = () => {
+      const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
+      setCompletedSessions(sessions);
+      completedSessionsRef.current = sessions;
+    };
+
+    loadSessions();
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "completedSessions") {
+        loadSessions();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const totalSessions = completedSessionsRef.current.length;
+  const totalMinutes = completedSessionsRef.current.reduce((sum, s) => sum + s.duration, 0);
 
   const getRoutineDuration = (routine: Routine) => {
     return routine.stretches

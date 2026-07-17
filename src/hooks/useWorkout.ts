@@ -16,8 +16,8 @@ interface UseWorkoutOptions {
 export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions) {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const elapsedSecondsRef = useRef(0);
   const timerRef = useRef<number | null>(null);
   const currentExerciseIndexRef = useRef(0);
 
@@ -30,7 +30,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
 
   const startTimer = useCallback(() => {
     timerRef.current = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
+      elapsedSecondsRef.current += 1;
     }, 1000);
   }, []);
 
@@ -61,7 +61,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
       id: crypto.randomUUID(),
       routineId: routine.id,
       routineTitle: routine.title,
-      duration: elapsedSeconds,
+      duration: elapsedSecondsRef.current,
       completedAt: new Date().toISOString(),
     };
 
@@ -75,20 +75,15 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     if (onComplete) {
       onComplete(completedSession);
     }
-  }, [stopTimer, routine, elapsedSeconds, onComplete]);
+  }, [stopTimer, routine, onComplete]);
 
   const nextExercise = useCallback(() => {
-    console.log('[useWorkout] nextExercise called, current index:', currentExerciseIndexRef.current);
-    console.log('[useWorkout] totalExercises:', totalExercises);
     setCurrentExerciseIndex((prev) => {
       const newIndex = prev + 1;
-      console.log('[useWorkout] prev:', prev, 'newIndex:', newIndex, 'totalExercises:', totalExercises);
       if (newIndex >= totalExercises) {
-        console.log('[useWorkout] finishing workout');
         finishWorkout();
         return prev;
       }
-      console.log('[useWorkout] moving to exercise:', newIndex);
       return newIndex;
     });
   }, [totalExercises, finishWorkout]);
@@ -105,7 +100,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   const reset = useCallback(() => {
     setCurrentExerciseIndex(0);
     setIsCompleted(false);
-    setElapsedSeconds(0);
+    elapsedSecondsRef.current = 0;
     setIsPaused(false);
     stopTimer();
   }, [stopTimer]);
@@ -120,7 +115,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     totalExercises,
     isCompleted,
     isPaused,
-    elapsedSeconds,
+    elapsedSeconds: elapsedSecondsRef.current,
     nextExercise,
     previousExercise,
     finishWorkout,

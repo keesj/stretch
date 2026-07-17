@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Card } from "../components/Card";
@@ -16,9 +16,27 @@ export function Settings() {
   const [settings, setSettings] = useState<Settings>(() =>
     loadFromStorage("settings", DEFAULT_SETTINGS)
   );
-  const [completedSessions, setCompletedSessions] = useState<CompletedSession[]>(() =>
-    loadFromStorage("completedSessions", [])
-  );
+  const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
+  const completedSessionsRef = useRef<CompletedSession[]>([]);
+
+  useEffect(() => {
+    const loadSessions = () => {
+      const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
+      setCompletedSessions(sessions);
+      completedSessionsRef.current = sessions;
+    };
+
+    loadSessions();
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "completedSessions") {
+        loadSessions();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   useEffect(() => {
     saveToStorage("settings", settings);
@@ -48,8 +66,8 @@ export function Settings() {
     navigate("/");
   };
 
-  const totalSessions = completedSessions.length;
-  const totalMinutes = completedSessions.reduce((sum, s) => sum + s.duration, 0);
+  const totalSessions = completedSessionsRef.current.length;
+  const totalMinutes = completedSessionsRef.current.reduce((sum, s) => sum + s.duration, 0);
 
   return (
     <motion.div
