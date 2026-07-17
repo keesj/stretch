@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ExerciseCard } from "../components/ExerciseCard";
@@ -42,6 +42,7 @@ export function Session() {
     isPaused,
     elapsedSeconds,
     nextExercise,
+    previousExercise,
     reset,
   } = useWorkout({
     routine,
@@ -55,65 +56,69 @@ export function Session() {
   const [showNextPreview, setShowNextPreview] = useState(false);
   const [showTransitionMessage, setShowTransitionMessage] = useState(false);
   const [countdownState, setCountdownState] = useState<"idle" | "running" | "done">("idle");
-  const [manualStart, setManualStart] = useState(false);
 
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
     onComplete: () => {
-      setManualStart(false);
       nextExercise();
     },
   });
 
   const playBeep = useBeep(true);
   const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
-  const shouldAutoStartRef = useRef(false);
+  const countdownCompleteRef = useRef(false);
 
-  // Reset countdown state when exercise changes
+  // Reset countdown when exercise changes
   useEffect(() => {
-    // Clear any pending timers
     if (countdownTimersRef.current) {
       countdownTimersRef.current.forEach(clearTimeout);
       countdownTimersRef.current = null;
     }
     setCountdownState("idle");
-    setManualStart(false);
     resetTimer(currentExercise.duration);
-    shouldAutoStartRef.current = false;
+    countdownCompleteRef.current = false;
   }, [currentExercise, resetTimer]);
 
-  // Countdown logic: 3 beeps, then start timer
-  useEffect(() => {
-    if (countdownState !== "running") return;
+  // Countdown: 3 beeps at 0s, 1s, 2s then start timer at 3s
+  const startCountdown = useCallback(() => {
+    if (countdownTimersRef.current) {
+      countdownTimersRef.current.forEach(clearTimeout);
+      countdownTimersRef.current = null;
+    }
+    
+    countdownCompleteRef.current = false;
+    setCountdownState("running");
 
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    // Beep #1 (at 0s)
+    // Beep at 0s
     playBeep(800, 0.1);
 
-    // Beep #2 (at 1s)
+    // Beep at 1s
     timers.push(setTimeout(() => playBeep(800, 0.1), 1000));
 
-    // Beep #3 (at 2s)
+    // Beep at 2s
     timers.push(setTimeout(() => playBeep(800, 0.1), 2000));
 
-    // Start timer (at 3s) - auto for subsequent exercises, wait for manual start
+    // Start timer at 3s
     timers.push(setTimeout(() => {
-      if (!manualStart && !isCompleted) {
+      countdownCompleteRef.current = true;
+      if (!isCompleted) {
         start();
       }
     }, 3000));
 
     countdownTimersRef.current = timers;
+  }, [playBeep, start, isCompleted]);
 
-    return () => {
-      if (countdownTimersRef.current) {
-        countdownTimersRef.current.forEach(clearTimeout);
-        countdownTimersRef.current = null;
-      }
-    };
-
-  }, [countdownState, playBeep, start, manualStart, isCompleted]);
+  const stopCountdown = useCallback(() => {
+    if (countdownTimersRef.current) {
+      countdownTimersRef.current.forEach(clearTimeout);
+      countdownTimersRef.current = null;
+    }
+    setCountdownState("idle");
+    countdownCompleteRef.current = false;
+  }, []);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 8 && currentExerciseIndex < totalExercises - 1) {
@@ -131,22 +136,20 @@ export function Session() {
     }
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
-  const handleSkip = () => {
-    setManualStart(false);
-    setCountdownState("idle");
+  const handleSkip = useCallback(() => {
+    stopCountdown();
     skip();
     if (currentExerciseIndex < totalExercises - 1) {
       nextExercise();
     }
-  };
+  }, [stopCountdown, skip, nextExercise, currentExerciseIndex, totalExercises]);
 
-  const handlePrevious = () => {
-    setManualStart(false);
-    setCountdownState("idle");
+  const handlePrevious = useCallback(() => {
+    stopCountdown();
     if (currentExerciseIndex > 0) {
-      nextExercise();
+      previousExercise();
     }
-  };
+  }, [stopCountdown, previousExercise, currentExerciseIndex]);
 
   const handleReturnHome = () => {
     reset();
@@ -299,8 +302,7 @@ export function Session() {
             if (isRunning) {
               pause();
             } else {
-              setManualStart(true);
-              setCountdownState("running");
+              startCountdown();
             }
           }}
           className="flex-1"
