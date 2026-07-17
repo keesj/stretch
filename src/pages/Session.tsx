@@ -142,12 +142,12 @@ export function Session() {
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
   const handleSkip = useCallback(() => {
-    stopCountdown();
-    skip();
     if (currentExerciseIndex < totalExercises - 1) {
-      nextExercise();
+      stopCountdown();
+      skip();
+      startCountdown();
     }
-  }, [stopCountdown, skip, nextExercise, currentExerciseIndex, totalExercises]);
+  }, [stopCountdown, skip, startCountdown, currentExerciseIndex, totalExercises]);
 
   const handlePrevious = useCallback(() => {
     stopCountdown();
