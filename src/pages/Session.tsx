@@ -67,6 +67,7 @@ export function Session() {
   const playBeep = useBeep(true);
   const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
   const countdownCompleteRef = useRef(false);
+  const isTransitioningRef = useRef(false);
 
   // Countdown: 3 beeps at 0s, 1s, 2s then start timer at 3s
   const startCountdown = useCallback(() => {
@@ -92,6 +93,7 @@ export function Session() {
     // Start timer at 3s
     timers.push(setTimeout(() => {
       countdownCompleteRef.current = true;
+      isTransitioningRef.current = false;
       if (!isCompleted) {
         start();
       }
@@ -107,6 +109,7 @@ export function Session() {
     }
     setCountdownState("idle");
     countdownCompleteRef.current = false;
+    isTransitioningRef.current = false;
   }, []);
 
   // Reset countdown and timer when exercise changes
@@ -118,9 +121,10 @@ export function Session() {
     setCountdownState("idle");
     resetTimer(currentExercise.duration);
     countdownCompleteRef.current = false;
+    isTransitioningRef.current = false;
 
-    // Auto-start countdown for all exercises except the first one
-    if (currentExerciseIndex > 0 && !isCompleted) {
+    // Auto-start countdown for all exercises except the first one (only on natural progression)
+    if (currentExerciseIndex > 0 && !isCompleted && !isTransitioningRef.current) {
       startCountdown();
     }
   }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, startCountdown]);
@@ -143,11 +147,12 @@ export function Session() {
 
   const handleSkip = useCallback(() => {
     if (currentExerciseIndex < totalExercises - 1) {
+      isTransitioningRef.current = true;
       stopCountdown();
       resetTimer(currentExercise.duration);
-      startCountdown();
+      nextExercise();
     }
-  }, [stopCountdown, resetTimer, currentExercise, startCountdown, currentExerciseIndex, totalExercises]);
+  }, [stopCountdown, resetTimer, nextExercise, currentExercise, currentExerciseIndex, totalExercises]);
 
   const handlePrevious = useCallback(() => {
     stopCountdown();
@@ -156,11 +161,12 @@ export function Session() {
     }
   }, [stopCountdown, previousExercise, currentExerciseIndex]);
 
-  const handleReturnHome = () => {
+  const handleReturnHome = useCallback(() => {
+    stopCountdown();
     reset();
     resetTimer(0);
     navigate("/");
-  };
+  }, [stopCountdown, reset, resetTimer, navigate]);
 
   if (isCompleted) {
     return (
@@ -209,12 +215,18 @@ export function Session() {
       exit={{ opacity: 0 }}
       className="px-4 py-6 pb-24 max-w-md mx-auto"
     >
-      <div className="mb-6">
-        <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={handleReturnHome}
+          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+        >
+          ← Back
+        </button>
+        <div className="text-sm text-gray-500 dark:text-gray-400">
           Exercise {currentExerciseIndex + 1} of {totalExercises}
         </div>
-        <ProgressBar current={currentExerciseIndex + 1} total={totalExercises} />
       </div>
+      <ProgressBar current={currentExerciseIndex + 1} total={totalExercises} />
 
       <AnimatePresence mode="wait">
         <motion.div
