@@ -262,13 +262,13 @@ export function Session() {
         >
           <Card className="p-4 bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800">
             <div className="text-center">
-              <div className="text-sm text-primary-600 dark:text-primary-400 mb-2">
+              <div className="text-sm text-primary-600 dark:text-primary-300 mb-2">
                 Next up
               </div>
-              <div className="text-lg font-semibold mb-1">
+              <div className="text-lg font-semibold mb-1 text-primary-700 dark:text-primary-200">
                 {exerciseStretches[currentExerciseIndex + 1]?.title}
               </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
+              <div className="text-sm text-gray-600 dark:text-gray-300">
                 {exerciseStretches[currentExerciseIndex + 1]?.illustration}
               </div>
             </div>
