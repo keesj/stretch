@@ -14,3 +14,12 @@ Object.defineProperty(globalThis, 'localStorage', {
 
 // Mock crypto.randomUUID
 vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid-12345');
+
+// Mock react-router-dom useNavigate
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
