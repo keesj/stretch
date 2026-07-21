@@ -61,6 +61,7 @@ export function Session() {
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
     onComplete: () => {
+      playFinalBeep();
       nextExercise();
     },
   });
@@ -68,9 +69,35 @@ export function Session() {
   useWakeLock({ isActive: isRunning && !isPaused });
 
   const playBeep = useBeep(true);
+  const playTick = useBeep(true);
+  const playFinalBeep = useBeep(true);
   const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
   const countdownCompleteRef = useRef(false);
   const isTransitioningRef = useRef(false);
+  const lastTickTimeRef = useRef<number>(currentExercise.duration);
+
+  useEffect(() => {
+    if (tickIntervalRef.current) {
+      clearInterval(tickIntervalRef.current);
+      tickIntervalRef.current = null;
+    }
+
+    if (isRunning && !isPaused && !isCompleted) {
+      tickIntervalRef.current = setInterval(() => {
+        if (timeLeft <= lastTickTimeRef.current - 5) {
+          lastTickTimeRef.current = timeLeft;
+          playTick();
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (tickIntervalRef.current) {
+        clearInterval(tickIntervalRef.current);
+        tickIntervalRef.current = null;
+      }
+    };
+  }, [isRunning, isPaused, isCompleted, timeLeft, playTick]);
 
   // Countdown: 3 beeps at 0s, 1s, 2s then start timer at 3s
   const startCountdown = useCallback(() => {
@@ -125,6 +152,7 @@ export function Session() {
     resetTimer(currentExercise.duration);
     countdownCompleteRef.current = false;
     isTransitioningRef.current = false;
+    lastTickTimeRef.current = currentExercise.duration;
 
     // Auto-start countdown for all exercises except the first one (only on natural progression)
     if (currentExerciseIndex > 0 && !isCompleted && !isTransitioningRef.current) {

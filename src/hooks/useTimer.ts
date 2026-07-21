@@ -11,10 +11,15 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   const intervalRef = useRef<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
+  const lastTickTimeRef = useRef(initialTime);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+
+  useEffect(() => {
+    lastTickTimeRef.current = initialTime;
+  }, [initialTime]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -34,6 +39,12 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
             }
             return 0;
           }
+          
+          const fiveSecondMark = Math.ceil(prev / 5) * 5;
+          if (fiveSecondMark < lastTickTimeRef.current) {
+            lastTickTimeRef.current = fiveSecondMark;
+          }
+          
           return prev - 1;
         });
       }, 1000);
