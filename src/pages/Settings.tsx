@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
+import { useTheme } from "../hooks/useTheme";
 import {
   loadFromStorage,
   saveToStorage,
@@ -18,12 +19,20 @@ export function Settings() {
   );
   const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const completedSessionsRef = useRef<CompletedSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useTheme(settings);
+
+  useEffect(() => {
+    saveToStorage("settings", settings);
+  }, [settings]);
 
   useEffect(() => {
     const loadSessions = () => {
       const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
       setCompletedSessions(sessions);
       completedSessionsRef.current = sessions;
+      setIsLoading(false);
     };
 
     loadSessions();
@@ -38,27 +47,19 @@ export function Settings() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  useEffect(() => {
-    saveToStorage("settings", settings);
-    applyTheme(settings.theme);
-  }, [settings]);
-
-  const applyTheme = (theme: "light" | "dark" | "system") => {
-    const root = document.documentElement;
-    
-    if (theme === "system") {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      root.classList.toggle("dark", prefersDark);
-    } else {
-      root.classList.toggle("dark", theme === "dark");
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-calm-50 dark:bg-gray-900">
+        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+      </div>
+    );
+  }
 
   const handleResetProgress = () => {
-    if (confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
-      localStorage.removeItem("completedSessions");
+    if (typeof confirm === "function" && confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
+      try { localStorage.removeItem("completedSessions"); } catch { /* storage unavailable */ }
       setCompletedSessions([]);
-      alert("Progress has been reset.");
+      if (typeof alert === "function") alert("Progress has been reset.");
     }
   };
 

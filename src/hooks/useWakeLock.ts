@@ -15,33 +15,52 @@ export function useWakeLock({ isActive = true }: UseWakeLockOptions): WakeLockRe
   const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
-    setIsSupported("wakeLock" in navigator);
+    try {
+      setIsSupported("wakeLock" in navigator);
+    } catch {
+      setIsSupported(false);
+    }
   }, []);
 
   const requestWakeLock = useCallback(async () => {
     if (!isSupported || !isActive) return;
 
     try {
+      // Guard against navigator.wakeLock being null or request not being a function
+      const wakeLock = (navigator as any).wakeLock;
+      if (!wakeLock || typeof wakeLock.request !== "function") return;
+
       if (wakeLockRef.current) {
         return;
       }
 
-      wakeLockRef.current = await navigator.wakeLock.request("screen");
+      wakeLockRef.current = await wakeLock.request("screen");
 
-      wakeLockRef.current.addEventListener("release", () => {
+      if (!wakeLockRef.current) {
+        return;
+      }
+
+      const currentLock = wakeLockRef.current;
+      currentLock.addEventListener("release", () => {
+        currentLock.release().catch(() => { /* already released */ });
         wakeLockRef.current = null;
       });
     } catch (err) {
-      console.error("Failed to acquire wake lock:", err);
+      console.warn("Failed to acquire wake lock:", err);
+      wakeLockRef.current = null;
     }
   }, [isSupported, isActive]);
 
   const releaseWakeLock = useCallback(() => {
-    if (wakeLockRef.current) {
-      wakeLockRef.current.release().catch((err) => {
-        console.error("Failed to release wake lock:", err);
-      });
-      wakeLockRef.current = null;
+    try {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {
+          // ignore release errors
+        });
+        wakeLockRef.current = null;
+      }
+    } catch (err) {
+      console.warn("Failed to release wake lock:", err);
     }
   }, []);
 
@@ -54,16 +73,20 @@ export function useWakeLock({ isActive = true }: UseWakeLockOptions): WakeLockRe
   }, [isActive, requestWakeLock, releaseWakeLock]);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && isActive && wakeLockRef.current) {
-        releaseWakeLock();
-      }
-    };
+    try {
+      const handleVisibilityChange = () => {
+        if (document.hidden && isActive && wakeLockRef.current) {
+          releaseWakeLock();
+        }
+      };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      return () => {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+    } catch {
+      // visibilitychange not supported in this environment
+    }
   }, [isActive, releaseWakeLock]);
 
   return {

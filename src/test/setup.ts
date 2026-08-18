@@ -1,5 +1,10 @@
 import '@testing-library/jest-dom';
 
+// Ensure root element exists for modules that call createRoot
+const rootElement = document.createElement('div');
+rootElement.id = 'root';
+document.body.appendChild(rootElement);
+
 // Mock localStorage
 const localStorageMock = {
   getItem: vi.fn(),

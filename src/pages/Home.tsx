@@ -8,6 +8,7 @@ import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import {
   loadFromStorage,
+  saveToStorage,
   type CompletedSession,
 } from "../utils/storage";
 
@@ -20,12 +21,18 @@ export function Home() {
   const [stretches] = useState<Stretch[]>(stretchesData as Stretch[]);
   const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const completedSessionsRef = useRef<CompletedSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadSessions = () => {
-      const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
-      setCompletedSessions(sessions);
-      completedSessionsRef.current = sessions;
+      try {
+        const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
+        setCompletedSessions(sessions);
+        completedSessionsRef.current = sessions;
+      } catch {
+        setCompletedSessions([]);
+      }
+      setIsLoading(false);
     };
 
     loadSessions();
@@ -36,9 +43,24 @@ export function Home() {
       }
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    try {
+      window.addEventListener("storage", handleStorageChange);
+    } catch { /* storage events not supported */ }
+    
+    return () => {
+      try {
+        window.removeEventListener("storage", handleStorageChange);
+      } catch { /* cleanup failed */ }
+    };
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-calm-50 dark:bg-gray-900">
+        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+      </div>
+    );
+  }
 
   const totalSessions = completedSessionsRef.current.length;
   const totalMinutes = completedSessionsRef.current.reduce((sum, s) => sum + s.duration, 0);
@@ -105,15 +127,21 @@ export function Home() {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <RoutineCard
-            routine={featuredRoutine}
-            stretchCount={featuredRoutine.stretches.length}
-            totalDuration={getRoutineDuration(featuredRoutine)}
-            onStart={() => {
-              localStorage.setItem("activeRoutine", featuredRoutine.id);
-              navigate("/session");
-            }}
-          />
+            <RoutineCard
+                routine={featuredRoutine}
+                stretchCount={featuredRoutine.stretches.length}
+                totalDuration={getRoutineDuration(featuredRoutine)}
+                onStart={() => {
+                  saveToStorage("activeSession", {
+                    routineId: featuredRoutine.id,
+                    currentExerciseIndex: 0,
+                    startTime: new Date().toISOString(),
+                    elapsedSeconds: 0,
+                    isPaused: false,
+                  });
+                  navigate("/session");
+                }}
+              />
         </motion.div>
       </section>
 
@@ -121,22 +149,28 @@ export function Home() {
         <h2 className="text-lg font-semibold mb-3">All Routines</h2>
         <div className="space-y-3">
           {otherRoutines.map((routine, index) => (
-            <motion.div
-              key={routine.id}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 + index * 0.1 }}
-            >
-              <RoutineCard
-                routine={routine}
-                stretchCount={routine.stretches.length}
-                totalDuration={getRoutineDuration(routine)}
-                onStart={() => {
-                  localStorage.setItem("activeRoutine", routine.id);
-                  navigate("/session");
-                }}
-              />
-            </motion.div>
+              <motion.div
+                key={routine.id}
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+              >
+                <RoutineCard
+                  routine={routine}
+                  stretchCount={routine.stretches.length}
+                  totalDuration={getRoutineDuration(routine)}
+                  onStart={() => {
+                    saveToStorage("activeSession", {
+                      routineId: routine.id,
+                      currentExerciseIndex: 0,
+                      startTime: new Date().toISOString(),
+                      elapsedSeconds: 0,
+                      isPaused: false,
+                    });
+                    navigate("/session");
+                  }}
+                />
+              </motion.div>
           ))}
         </div>
       </section>

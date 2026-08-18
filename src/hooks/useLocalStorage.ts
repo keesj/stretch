@@ -6,8 +6,10 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.error(error);
-      return initialValue;
+      if (error instanceof Error) {
+        throw new Error(`Failed to read from localStorage: ${error.message}`);
+      }
+      throw error;
     }
   });
 
@@ -18,7 +20,10 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
         try {
           window.localStorage.setItem(key, JSON.stringify(valueToStore));
         } catch (error) {
-          console.error(error);
+          if (error instanceof Error) {
+            throw new Error(`Failed to write to localStorage: ${error.message}`);
+          }
+          throw error;
         }
         return valueToStore;
       });
@@ -30,7 +35,10 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     try {
       window.localStorage.removeItem(key);
     } catch (error) {
-      console.error(error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to remove from localStorage: ${error.message}`);
+      }
+      throw error;
     }
     setStoredValue(initialValue);
   }, [key, initialValue]);

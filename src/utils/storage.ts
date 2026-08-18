@@ -37,7 +37,8 @@ export function loadFromStorage<T>(key: StorageKey, defaultValue: T): T {
   try {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : defaultValue;
-  } catch {
+  } catch (error: any) {
+    console.warn(`Failed to load from localStorage for key "${key}":`, error?.message || error);
     return defaultValue;
   }
 }
@@ -45,11 +46,16 @@ export function loadFromStorage<T>(key: StorageKey, defaultValue: T): T {
 export function saveToStorage<T>(key: StorageKey, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error saving to localStorage for key "${key}":`, error);
+  } catch (error: any) {
+    console.warn(`Failed to save to localStorage for key "${key}":`, error?.message || error);
+    // Silently fail — app can still function without localStorage
   }
 }
 
 export function clearStorage(key: StorageKey): void {
-  localStorage.removeItem(key);
+  try {
+    localStorage.removeItem(key);
+  } catch (error: any) {
+    console.warn(`Failed to remove from localStorage for key "${key}":`, error?.message || error);
+  }
 }

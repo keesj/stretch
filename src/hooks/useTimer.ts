@@ -11,38 +11,26 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   const intervalRef = useRef<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
-  const lastTickTimeRef = useRef(initialTime);
+  const timeLeftRef = useRef(initialTime);
+  timeLeftRef.current = timeLeft;
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
+    return () => { onCompleteRef.current = undefined; };
   }, [onComplete]);
 
   useEffect(() => {
-    lastTickTimeRef.current = initialTime;
-  }, [initialTime]);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (isRunning && timeLeft > 0) {
+    if (isRunning && timeLeftRef.current > 0 && !hasCompletedRef.current) {
       intervalRef.current = setInterval(() => {
         setTimeLeft((prev) => {
-          if (prev <= 1 && !hasCompletedRef.current) {
+          if (prev <= 1) {
             hasCompletedRef.current = true;
             if (onCompleteRef.current) {
               onCompleteRef.current();
             }
-          }
-          if (prev <= 1) {
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-            }
+            clearInterval(intervalRef.current!);
+            intervalRef.current = null;
             return 0;
-          }
-          
-          const fiveSecondMark = Math.ceil(prev / 5) * 5;
-          if (fiveSecondMark < lastTickTimeRef.current) {
-            lastTickTimeRef.current = fiveSecondMark;
           }
           
           return prev - 1;
@@ -59,7 +47,10 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
   }, [isRunning]);
 
   const start = useCallback(() => {
-    setIsRunning(true);
+    if (timeLeftRef.current > 0) {
+      hasCompletedRef.current = false;
+      setIsRunning(true);
+    }
   }, []);
 
   const pause = useCallback(() => {
@@ -68,6 +59,8 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
 
   const reset = useCallback(
     (newTime?: number) => {
+      clearInterval(intervalRef.current!);
+      intervalRef.current = null;
       setIsRunning(false);
       setTimeLeft(newTime ?? initialTime);
       hasCompletedRef.current = false;
@@ -77,6 +70,7 @@ export function useTimer({ initialTime = 60, onComplete }: UseTimerOptions) {
 
   const skip = useCallback(() => {
     setTimeLeft(0);
+    setIsRunning(false);
   }, []);
 
   return {

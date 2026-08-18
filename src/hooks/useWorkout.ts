@@ -13,20 +13,32 @@ interface UseWorkoutOptions {
   onComplete?: (session: CompletedSession) => void;
 }
 
+function generateId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments without crypto (older Android WebView, etc.)
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions) {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const elapsedSecondsRef = useRef(0);
   const timerRef = useRef<number | null>(null);
-  const currentExerciseIndexRef = useRef(0);
+  const completeCallbackRef = useRef(onComplete);
+  const routineRef = useRef(routine);
+  const stretchesRef = useRef(stretches);
+  const isCompletedRef = useRef(isCompleted);
 
-  useEffect(() => {
-    currentExerciseIndexRef.current = currentExerciseIndex;
-  }, [currentExerciseIndex]);
+  completeCallbackRef.current = onComplete;
+  routineRef.current = routine;
+  stretchesRef.current = stretches;
+  isCompletedRef.current = isCompleted;
 
-  const currentExercise = stretches[currentExerciseIndex];
-  const totalExercises = routine.stretches.length;
+  const currentExercise = stretchesRef.current[currentExerciseIndex];
+  const totalExercises = routineRef.current.stretches.length;
 
   const startTimer = useCallback(() => {
     timerRef.current = setInterval(() => {
@@ -58,9 +70,9 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     setIsCompleted(true);
 
     const completedSession: CompletedSession = {
-      id: crypto.randomUUID(),
-      routineId: routine.id,
-      routineTitle: routine.title,
+      id: generateId(),
+      routineId: routineRef.current.id,
+      routineTitle: routineRef.current.title,
       duration: elapsedSecondsRef.current,
       completedAt: new Date().toISOString(),
     };
@@ -72,10 +84,10 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     completedSessions.push(completedSession);
     saveToStorage("completedSessions", completedSessions);
 
-    if (onComplete) {
-      onComplete(completedSession);
+    if (completeCallbackRef.current) {
+      completeCallbackRef.current(completedSession);
     }
-  }, [stopTimer, routine, onComplete]);
+  }, [stopTimer]);
 
   const nextExercise = useCallback(() => {
     setCurrentExerciseIndex((prev) => {

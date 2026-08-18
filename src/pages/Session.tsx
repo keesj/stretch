@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ExerciseCard } from "../components/ExerciseCard";
@@ -21,19 +21,41 @@ const stretches = stretchesData as Stretch[];
 
 export function Session() {
   const navigate = useNavigate();
-  const routineId = useState<string>(() => {
-    const stored = localStorage.getItem("activeRoutine");
-    if (stored) {
-      localStorage.removeItem("activeRoutine");
-      return stored;
-    }
-    return routines[0].id;
-  })[0];
+  const [routineId, setRoutineId] = useState<string>(routines[0].id);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [showNextPreview, setShowNextPreview] = useState(false);
+  const [showTransitionMessage, setShowTransitionMessage] = useState(false);
+  const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
+  const countdownCompleteRef = useRef(false);
+  const isTransitioningRef = useRef(false);
+  const lastTickTimeRef = useRef<number>(60);
 
-  const routine = routines.find((r) => r.id === routineId) || routines[0];
-  const exerciseStretches = routine.stretches
-    .map((id) => stretches.find((s) => s.id === id))
-    .filter((s): s is Stretch => !!s);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("activeSession");
+      if (stored) {
+        try {
+          const session = JSON.parse(stored);
+          localStorage.removeItem("activeSession");
+          setRoutineId(session.routineId || routines[0].id);
+        } catch {
+          localStorage.removeItem("activeSession");
+        }
+      }
+    } catch { /* storage unavailable */ }
+    setIsLoading(false);
+  }, []);
+
+  const routine = useMemo(() => 
+    routines.find((r) => r.id === routineId) || routines[0]
+  , [routineId]);
+
+  const exerciseStretches = useMemo(() => 
+    routine.stretches
+      .map((id) => stretches.find((s) => s.id === id))
+      .filter((s): s is Stretch => !!s)
+  , [routine]);
 
   const {
     currentExercise,
@@ -41,7 +63,6 @@ export function Session() {
     totalExercises,
     isCompleted,
     isPaused,
-    elapsedSeconds,
     nextExercise,
     previousExercise,
     reset,
@@ -53,53 +74,16 @@ export function Session() {
     },
   });
 
-  const [showInstructions, setShowInstructions] = useState(false);
-  const [showNextPreview, setShowNextPreview] = useState(false);
-  const [showTransitionMessage, setShowTransitionMessage] = useState(false);
-  const [countdownState, setCountdownState] = useState<"idle" | "running" | "done">("idle");
-
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
     onComplete: () => {
-      playFinalBeep();
       nextExercise();
     },
   });
 
+  const { playBeep, playFinalBeep } = useBeep(true);
   useWakeLock({ isActive: isRunning && !isPaused });
 
-  const playBeep = useBeep(true);
-  const playTick = useBeep(true);
-  const playFinalBeep = useBeep(true);
-  const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
-  const countdownCompleteRef = useRef(false);
-  const isTransitioningRef = useRef(false);
-  const lastTickTimeRef = useRef<number>(currentExercise.duration);
-
-  useEffect(() => {
-    if (tickIntervalRef.current) {
-      clearInterval(tickIntervalRef.current);
-      tickIntervalRef.current = null;
-    }
-
-    if (isRunning && !isPaused && !isCompleted) {
-      tickIntervalRef.current = setInterval(() => {
-        if (timeLeft <= lastTickTimeRef.current - 5) {
-          lastTickTimeRef.current = timeLeft;
-          playTick();
-        }
-      }, 1000);
-    }
-
-    return () => {
-      if (tickIntervalRef.current) {
-        clearInterval(tickIntervalRef.current);
-        tickIntervalRef.current = null;
-      }
-    };
-  }, [isRunning, isPaused, isCompleted, timeLeft, playTick]);
-
-  // Countdown: 3 beeps at 0s, 1s, 2s then start timer at 3s
   const startCountdown = useCallback(() => {
     if (countdownTimersRef.current) {
       countdownTimersRef.current.forEach(clearTimeout);
@@ -107,54 +91,68 @@ export function Session() {
     }
     
     countdownCompleteRef.current = false;
-    setCountdownState("running");
 
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    // Beep at 0s
     playBeep(800, 0.1);
-
-    // Beep at 1s
     timers.push(setTimeout(() => playBeep(800, 0.1), 1000));
-
-    // Beep at 2s
     timers.push(setTimeout(() => playBeep(800, 0.1), 2000));
-
-    // Start timer at 3s
     timers.push(setTimeout(() => {
       countdownCompleteRef.current = true;
       isTransitioningRef.current = false;
+      playFinalBeep();
       if (!isCompleted) {
         start();
       }
     }, 3000));
 
     countdownTimersRef.current = timers;
-  }, [playBeep, start, isCompleted]);
+  }, [playBeep, playFinalBeep, start, isCompleted]);
 
   const stopCountdown = useCallback(() => {
     if (countdownTimersRef.current) {
       countdownTimersRef.current.forEach(clearTimeout);
       countdownTimersRef.current = null;
     }
-    setCountdownState("idle");
     countdownCompleteRef.current = false;
     isTransitioningRef.current = false;
   }, []);
 
-  // Reset countdown and timer when exercise changes
+  const goToNext = useCallback(() => {
+    if (currentExerciseIndex < totalExercises - 1) {
+      isTransitioningRef.current = true;
+      stopCountdown();
+      skip();
+      nextExercise();
+    }
+  }, [currentExerciseIndex, totalExercises, stopCountdown, skip, nextExercise]);
+
+  const goToPrevious = useCallback(() => {
+    stopCountdown();
+    if (currentExerciseIndex > 0) {
+      previousExercise();
+    }
+  }, [stopCountdown, previousExercise, currentExerciseIndex]);
+
+  const handleStartPause = useCallback(() => {
+    if (isRunning) {
+      pause();
+    } else {
+      startCountdown();
+    }
+  }, [isRunning, pause, startCountdown]);
+
   useEffect(() => {
     if (countdownTimersRef.current) {
       countdownTimersRef.current.forEach(clearTimeout);
       countdownTimersRef.current = null;
     }
-    setCountdownState("idle");
+    countdownCompleteRef.current = false;
     resetTimer(currentExercise.duration);
     countdownCompleteRef.current = false;
     isTransitioningRef.current = false;
     lastTickTimeRef.current = currentExercise.duration;
 
-    // Auto-start countdown for all exercises except the first one (only on natural progression)
     if (currentExerciseIndex > 0 && !isCompleted && !isTransitioningRef.current) {
       startCountdown();
     }
@@ -169,28 +167,12 @@ export function Session() {
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
 
   useEffect(() => {
-    if (!isPaused && !isCompleted && timeLeft <= 3 && currentExerciseIndex < totalExercises - 1) {
+    if (!isPaused && !isCompleted && timeLeft <= 15 && currentExerciseIndex < totalExercises - 1) {
       setShowNextPreview(true);
     } else {
       setShowNextPreview(false);
     }
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
-
-  const handleSkip = useCallback(() => {
-    if (currentExerciseIndex < totalExercises - 1) {
-      isTransitioningRef.current = true;
-      stopCountdown();
-      resetTimer(currentExercise.duration);
-      nextExercise();
-    }
-  }, [stopCountdown, resetTimer, nextExercise, currentExercise, currentExerciseIndex, totalExercises]);
-
-  const handlePrevious = useCallback(() => {
-    stopCountdown();
-    if (currentExerciseIndex > 0) {
-      previousExercise();
-    }
-  }, [stopCountdown, previousExercise, currentExerciseIndex]);
 
   const handleReturnHome = useCallback(() => {
     stopCountdown();
@@ -198,6 +180,14 @@ export function Session() {
     resetTimer(0);
     navigate("/");
   }, [stopCountdown, reset, resetTimer, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-calm-50 dark:bg-gray-900">
+        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -297,7 +287,7 @@ export function Session() {
       <div className="mt-8 flex gap-3">
         <Button
           variant="outline"
-          onClick={handlePrevious}
+          onClick={goToPrevious}
           disabled={currentExerciseIndex === 0}
           className="flex-1"
         >
@@ -306,19 +296,13 @@ export function Session() {
 
         <Button
           variant="secondary"
-          onClick={() => {
-            if (isRunning) {
-              pause();
-            } else {
-              startCountdown();
-            }
-          }}
+          onClick={handleStartPause}
           className="flex-1"
         >
           {isRunning ? "Pause" : "Start"}
         </Button>
 
-        <Button onClick={handleSkip} className="flex-1">
+        <Button onClick={goToNext} className="flex-1">
           Next
         </Button>
       </div>

@@ -3,10 +3,28 @@ import { useEffect, useCallback, useRef } from "react";
 export function useBeep(enabled: boolean) {
   const audioContextRef = useRef<AudioContext | null>(null);
 
+  const getAudioContext = useCallback((): AudioContext | null => {
+    if (audioContextRef.current) {
+      return audioContextRef.current;
+    }
+    try {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return null;
+      audioContextRef.current = new AC();
+      return audioContextRef.current;
+    } catch {
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+      try {
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+        }
+      } catch {
+        // ignore close errors
       }
     };
   }, []);
@@ -14,80 +32,55 @@ export function useBeep(enabled: boolean) {
   const playBeep = useCallback(
     (frequency: number = 800, duration: number = 0.1) => {
       if (!enabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
 
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext ||
-          (window as any).webkitAudioContext)();
+      try {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        oscillator.frequency.value = frequency;
+        oscillator.type = "sine";
+
+        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + duration);
+      } catch {
+        // audio failed — beep silently
       }
+    },
+    [enabled, getAudioContext]
+  );
 
-      const ctx = audioContextRef.current;
+  const playFinalBeep = useCallback(() => {
+    if (!enabled) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
 
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
 
-      oscillator.frequency.value = frequency;
+      oscillator.frequency.value = 1200;
       oscillator.type = "sine";
 
-      gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+      gainNode.gain.setValueAtTime(0.4, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
 
       oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + duration);
-    },
-    [enabled]
-  );
-
-  const playTick = useCallback(() => {
-    if (!enabled) return;
-
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
+      oscillator.stop(ctx.currentTime + 0.3);
+    } catch {
+      // audio failed — beep silently
     }
+  }, [enabled, getAudioContext]);
 
-    const ctx = audioContextRef.current;
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    oscillator.frequency.value = 400;
-    oscillator.type = "sine";
-
-    gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
-
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.05);
-  }, [enabled]);
-
-  const playFinalBeep = useCallback(() => {
-    if (!enabled) return;
-
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
-    }
-
-    const ctx = audioContextRef.current;
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    oscillator.frequency.value = 1200;
-    oscillator.type = "sine";
-
-    gainNode.gain.setValueAtTime(0.4, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.3);
-  }, [enabled]);
-
-  return playBeep;
+  return { playBeep, playFinalBeep };
 }
