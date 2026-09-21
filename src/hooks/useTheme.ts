@@ -25,8 +25,8 @@ export function useTheme(settings: Settings) {
   }, []);
 
   useEffect(() => {
-    applyTheme(themeRef.current);
-  }, [applyTheme]);
+    applyTheme(settings.theme);
+  }, [applyTheme, settings.theme]);
 
   useEffect(() => {
     try {

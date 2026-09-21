@@ -50,7 +50,10 @@ export function ThemeInitializer() {
 
 try {
   createRoot(document.getElementById('root')!).render(
-    <App />
+    <>
+      <ThemeInitializer />
+      <App />
+    </>
   )
 } catch (err) {
   console.error('App rendering failed:', err);

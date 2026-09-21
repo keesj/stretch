@@ -7,7 +7,7 @@ document.body.appendChild(rootElement);
 
 // Mock localStorage
 const localStorageMock = {
-  getItem: vi.fn(),
+  getItem: vi.fn(() => null),
   setItem: vi.fn(),
   removeItem: vi.fn(),
   clear: vi.fn(),
@@ -27,4 +27,16 @@ vi.mock('react-router-dom', async (importOriginal) => {
     ...actual,
     useNavigate: () => vi.fn(),
   };
+});
+
+// Reset per-test state so mock state never leaks between tests
+beforeEach(() => {
+  localStorageMock.getItem.mockReset();
+  localStorageMock.getItem.mockImplementation(() => null);
+  localStorageMock.setItem.mockReset();
+  localStorageMock.removeItem.mockReset();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });

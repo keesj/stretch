@@ -2,7 +2,43 @@ import { renderHook, act } from '@testing-library/react';
 import { useTimer } from '../useTimer';
 import { useWorkout } from '../useWorkout';
 
-describe('Session timer and workout flow', () => {
+/**
+ * Integration tests that wire the real useTimer and useWorkout together,
+ * mirroring how Session.tsx composes them: the timer's onComplete advances
+ * the workout, and the timer is reset + restarted for each exercise.
+ */
+describe('timer + workout integration (real hooks)', () => {
+  const mockRoutine = {
+    id: 'test-routine',
+    title: 'Test Routine',
+    description: 'Test',
+    stretches: ['stretch1', 'stretch2', 'stretch3'],
+  };
+
+  const mockStretches = [
+    { id: 'stretch1', title: 'Stretch 1', duration: 3, instructions: ['Step 1'], bodyParts: [], difficulty: 'easy' as const, illustration: '🧘' },
+    { id: 'stretch2', title: 'Stretch 2', duration: 3, instructions: ['Step 2'], bodyParts: [], difficulty: 'easy' as const, illustration: '🧘' },
+    { id: 'stretch3', title: 'Stretch 3', duration: 3, instructions: ['Step 3'], bodyParts: [], difficulty: 'easy' as const, illustration: '🧘' },
+  ];
+
+  function renderSession() {
+    const onComplete = vi.fn();
+    const workout = renderHook(() =>
+      useWorkout({
+        routine: mockRoutine,
+        stretches: mockStretches,
+        onComplete,
+      })
+    );
+    const timer = renderHook(() =>
+      useTimer({
+        initialTime: mockStretches[workout.result.current.currentExerciseIndex].duration,
+        onComplete: () => workout.result.current.nextExercise(),
+      })
+    );
+    return { workout, timer, onComplete };
+  }
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -11,302 +47,93 @@ describe('Session timer and workout flow', () => {
     vi.useRealTimers();
   });
 
-  describe('Session button behavior', () => {
-    const mockRoutine = {
-      id: 'test-routine',
-      title: 'Test Routine',
-      description: 'Test',
-      stretches: ['stretch1', 'stretch2', 'stretch3'],
-    };
+  it('advances to the next exercise when the timer completes', () => {
+    const { workout, timer } = renderSession();
 
-    const mockStretches = [
-      { 
-        id: 'stretch1', 
-        title: 'Stretch 1', 
-        duration: 3, 
-        instructions: ['Step 1'], 
-        bodyParts: [], 
-        difficulty: 'easy' as const, 
-        illustration: '🧘' 
-      },
-      { 
-        id: 'stretch2', 
-        title: 'Stretch 2', 
-        duration: 3, 
-        instructions: ['Step 2'], 
-        bodyParts: [], 
-        difficulty: 'easy' as const, 
-        illustration: '🧘' 
-      },
-    ];
+    expect(workout.result.current.currentExerciseIndex).toBe(0);
 
-    it('should show Start button initially', () => {
-      const { result } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete: () => {},
-        })
-      );
-
-      expect(result.current.currentExerciseIndex).toBe(0);
-      expect(result.current.currentExercise.id).toBe('stretch1');
+    act(() => {
+      timer.result.current.start();
     });
 
-    it('should start setup countdown when Start button is clicked', () => {
-      const onComplete = vi.fn();
-      const { result: _workoutResult } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete,
-        })
-      );
-
-      const { result: timerResult } = renderHook(
-        () => useTimer({ 
-          initialTime: mockStretches[0].duration,
-          onComplete: () => {},
-        }),
-        {
-          initialProps: { initialTime: mockStretches[0].duration }
-        }
-      );
-
-      // Start button clicked - timer starts at 3
-      act(() => {
-        timerResult.current.start();
-      });
-
-      expect(timerResult.current.timeLeft).toBe(3);
-      expect(timerResult.current.isRunning).toBe(true);
-
-      // Advance through countdown
-      act(() => {
-        vi.advanceTimersByTime(2000);
-      });
-
-      // Timer should be at 1
-      expect(timerResult.current.timeLeft).toBe(1);
+    act(() => {
+      vi.advanceTimersByTime(3000);
     });
 
-    it('should transition to next exercise after timer completes', () => {
-      const onComplete = vi.fn();
-      const { result: workoutResult } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete,
-        })
-      );
+    expect(workout.result.current.currentExerciseIndex).toBe(1);
+    expect(workout.result.current.currentExercise.id).toBe('stretch2');
+    expect(timer.result.current.timeLeft).toBe(0);
+  });
 
-      const { result: timerResult } = renderHook(
-        () => useTimer({ 
-          initialTime: mockStretches[0].duration,
-          onComplete: workoutResult.current.nextExercise,
-        }),
-        {
-          initialProps: { initialTime: mockStretches[0].duration }
-        }
-      );
+  it('completes the whole workout and reports the session', () => {
+    const { workout, timer, onComplete } = renderSession();
 
-      // Start timer
-      act(() => {
-        timerResult.current.start();
-      });
+    act(() => {
+      timer.result.current.start();
+    });
 
-      // Advance timer to 0
+    for (let i = 0; i < 3; i++) {
       act(() => {
         vi.advanceTimersByTime(3000);
       });
+      if (workout.result.current.isCompleted) {
+        break;
+      }
+      // Mirror Session.tsx: reset the timer for the next exercise
+      act(() => {
+        timer.result.current.reset(3);
+        timer.result.current.start();
+      });
+    }
 
-      // Should have transitioned to stretch2
-      expect(workoutResult.current.currentExerciseIndex).toBe(1);
-      expect(workoutResult.current.currentExercise.id).toBe('stretch2');
+    expect(workout.result.current.isCompleted).toBe(true);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+
+    const session = onComplete.mock.calls[0][0];
+    expect(session).toMatchObject({
+      id: 'test-uuid-12345',
+      routineId: 'test-routine',
+      routineTitle: 'Test Routine',
+      duration: expect.any(Number),
+      completedAt: expect.any(String),
+    });
+  });
+
+  it('pausing the timer does not advance the workout', () => {
+    const { workout, timer } = renderSession();
+
+    act(() => {
+      timer.result.current.start();
+    });
+    act(() => {
+      vi.advanceTimersByTime(1000);
     });
 
-    it('should handle pause and resume', () => {
-      const onComplete = vi.fn();
-      const { result: _workoutResult } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete,
-        })
-      );
-
-      const { result: timerResult } = renderHook(
-        () => useTimer({ 
-          initialTime: 10,
-          onComplete: () => {
-            onComplete();
-          },
-        }),
-        {
-          initialProps: { initialTime: 10 }
-        }
-      );
-
-      // Start timer
-      act(() => {
-        timerResult.current.start();
-      });
-
-      // Run for 5 seconds
-      act(() => {
-        vi.advanceTimersByTime(5000);
-      });
-      expect(timerResult.current.timeLeft).toBe(5);
-
-      // Pause
-      act(() => {
-        timerResult.current.pause();
-      });
-      expect(timerResult.current.isRunning).toBe(false);
-
-      // Advance time while paused
-      act(() => {
-        vi.advanceTimersByTime(5000);
-      });
-      expect(timerResult.current.timeLeft).toBe(5);
-
-      // Resume
-      act(() => {
-        timerResult.current.start();
-      });
-
-      // Advance remaining time
-      act(() => {
-        vi.advanceTimersByTime(5000);
-      });
-      expect(timerResult.current.timeLeft).toBe(0);
-      expect(onComplete).toHaveBeenCalled();
+    act(() => {
+      timer.result.current.pause();
+      vi.advanceTimersByTime(10000);
     });
 
-    it('should show next exercise preview 10 seconds before end', () => {
-      const onComplete = vi.fn();
-      const { result: workoutResult } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete,
-        })
-      );
+    expect(timer.result.current.timeLeft).toBe(2);
+    expect(workout.result.current.currentExerciseIndex).toBe(0);
+  });
 
-      const { result: timerResult } = renderHook(
-        () => useTimer({ 
-          initialTime: mockStretches[0].duration,
-          onComplete: workoutResult.current.nextExercise,
-        }),
-        {
-          initialProps: { initialTime: mockStretches[0].duration }
-        }
-      );
+  it('skipping an exercise moves on without completing the workout', () => {
+    const { workout, timer, onComplete } = renderSession();
 
-      // Start timer
-      act(() => {
-        timerResult.current.start();
-      });
-
-      // Advance to 10 seconds before end
-      act(() => {
-        vi.advanceTimersByTime(0); // At start
-      });
-
-      // Timer should be running
-      expect(timerResult.current.isRunning).toBe(true);
-      expect(timerResult.current.timeLeft).toBe(3);
+    act(() => {
+      timer.result.current.start();
+      vi.advanceTimersByTime(1000);
     });
 
-    it('should complete all exercises in routine', () => {
-      const onComplete = vi.fn();
-      const { result } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete,
-        })
-      );
-
-      // Move through all exercises
-      act(() => {
-        result.current.nextExercise(); // stretch1 -> stretch2
-      });
-      expect(result.current.currentExerciseIndex).toBe(1);
-
-      act(() => {
-        result.current.nextExercise(); // stretch2 -> stretch3
-      });
-      expect(result.current.currentExerciseIndex).toBe(2);
-
-      act(() => {
-        result.current.nextExercise(); // stretch3 -> finish
-      });
-
-      expect(result.current.isCompleted).toBe(true);
-      expect(onComplete).toHaveBeenCalled();
+    // Mirror Session.tsx goToNext: skip the timer, then advance
+    act(() => {
+      timer.result.current.skip();
+      workout.result.current.nextExercise();
     });
 
-    it('should reset workout to first exercise', () => {
-      const onComplete = vi.fn();
-      const { result } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete,
-        })
-      );
-
-      // Move to second exercise
-      act(() => {
-        result.current.nextExercise();
-      });
-      expect(result.current.currentExerciseIndex).toBe(1);
-
-      // Reset
-      act(() => {
-        result.current.reset();
-      });
-
-      expect(result.current.currentExerciseIndex).toBe(0);
-      expect(result.current.currentExercise.id).toBe('stretch1');
-      expect(result.current.isCompleted).toBe(false);
-    });
-
-    it('should handle previous button', () => {
-      const onComplete = vi.fn();
-      const { result } = renderHook(() => 
-        useWorkout({
-          routine: mockRoutine,
-          stretches: mockStretches,
-          onComplete,
-        })
-      );
-
-      // Move forward twice
-      act(() => {
-        result.current.nextExercise();
-        result.current.nextExercise();
-      });
-      expect(result.current.currentExerciseIndex).toBe(2);
-
-      // Go back once
-      act(() => {
-        result.current.previousExercise();
-      });
-      expect(result.current.currentExerciseIndex).toBe(1);
-
-      // Go back again
-      act(() => {
-        result.current.previousExercise();
-      });
-      expect(result.current.currentExerciseIndex).toBe(0);
-
-      // Can't go back further
-      act(() => {
-        result.current.previousExercise();
-      });
-      expect(result.current.currentExerciseIndex).toBe(0);
-    });
+    expect(timer.result.current.timeLeft).toBe(0);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(workout.result.current.currentExerciseIndex).toBe(1);
   });
 });

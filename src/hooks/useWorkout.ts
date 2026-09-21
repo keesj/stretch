@@ -25,12 +25,15 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const elapsedSecondsRef = useRef(0);
-  const timerRef = useRef<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef(0);
+  const indexRef = useRef(0);
+  const isCompletedRef = useRef(false);
+  const isPausedRef = useRef(false);
   const completeCallbackRef = useRef(onComplete);
   const routineRef = useRef(routine);
   const stretchesRef = useRef(stretches);
-  const isCompletedRef = useRef(isCompleted);
 
   completeCallbackRef.current = onComplete;
   routineRef.current = routine;
@@ -41,8 +44,12 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   const totalExercises = routineRef.current.stretches.length;
 
   const startTimer = useCallback(() => {
+    if (timerRef.current) {
+      return;
+    }
     timerRef.current = setInterval(() => {
-      elapsedSecondsRef.current += 1;
+      elapsedRef.current += 1;
+      setElapsedSeconds(elapsedRef.current);
     }, 1000);
   }, []);
 
@@ -54,18 +61,17 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   }, []);
 
   useEffect(() => {
-    if (!isPaused && !isCompleted) {
-      startTimer();
-    } else {
-      stopTimer();
-    }
-
+    startTimer();
     return () => {
       stopTimer();
     };
-  }, [isPaused, isCompleted, startTimer, stopTimer]);
+  }, [startTimer, stopTimer]);
 
   const finishWorkout = useCallback(() => {
+    if (isCompletedRef.current) {
+      return;
+    }
+    isCompletedRef.current = true;
     stopTimer();
     setIsCompleted(true);
 
@@ -73,7 +79,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
       id: generateId(),
       routineId: routineRef.current.id,
       routineTitle: routineRef.current.title,
-      duration: elapsedSecondsRef.current,
+      duration: elapsedRef.current,
       completedAt: new Date().toISOString(),
     };
 
@@ -90,36 +96,51 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   }, [stopTimer]);
 
   const nextExercise = useCallback(() => {
-    setCurrentExerciseIndex((prev) => {
-      const newIndex = prev + 1;
-      if (newIndex >= totalExercises) {
-        finishWorkout();
-        return prev;
-      }
-      return newIndex;
-    });
+    if (isCompletedRef.current) {
+      return;
+    }
+
+    const index = indexRef.current;
+    if (index >= totalExercises - 1) {
+      finishWorkout();
+    } else {
+      const next = index + 1;
+      indexRef.current = next;
+      setCurrentExerciseIndex(next);
+    }
   }, [totalExercises, finishWorkout]);
 
   const previousExercise = useCallback(() => {
-    setCurrentExerciseIndex((prev) => {
-      if (prev > 0) {
-        return prev - 1;
-      }
-      return prev;
-    });
+    const prev = indexRef.current;
+    if (prev > 0) {
+      indexRef.current = prev - 1;
+      setCurrentExerciseIndex(prev - 1);
+    }
   }, []);
 
   const reset = useCallback(() => {
-    setCurrentExerciseIndex(0);
-    setIsCompleted(false);
-    elapsedSecondsRef.current = 0;
-    setIsPaused(false);
     stopTimer();
-  }, [stopTimer]);
+    startTimer();
+    indexRef.current = 0;
+    setCurrentExerciseIndex(0);
+    isCompletedRef.current = false;
+    setIsCompleted(false);
+    isPausedRef.current = false;
+    setIsPaused(false);
+    elapsedRef.current = 0;
+    setElapsedSeconds(0);
+  }, [startTimer, stopTimer]);
 
   const togglePause = useCallback(() => {
-    setIsPaused((prev) => !prev);
-  }, []);
+    const next = !isPausedRef.current;
+    isPausedRef.current = next;
+    setIsPaused(next);
+    if (next) {
+      stopTimer();
+    } else if (!isCompletedRef.current) {
+      startTimer();
+    }
+  }, [startTimer, stopTimer]);
 
   return {
     currentExercise,
@@ -127,7 +148,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     totalExercises,
     isCompleted,
     isPaused,
-    elapsedSeconds: elapsedSecondsRef.current,
+    elapsedSeconds,
     nextExercise,
     previousExercise,
     finishWorkout,
