@@ -1,6 +1,4 @@
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
-import { createAnimationController } from "../utils/animator";
 
 interface TimerProps {
   displayTime: number;
@@ -20,35 +18,18 @@ export function Timer({
   isTransitionMessage = false,
 }: TimerProps) {
   const isTransition = isTransitionMessage;
-  
+
   const displayText = isTransition
     ? countdownDisplay ?? displayTime
     : displayTime;
 
-  const [displayProgress, setDisplayProgress] = useState(0);
-  const animatorRef = useRef<ReturnType<typeof createAnimationController>>(
-    createAnimationController(0, 1000)
-  );
-  // Replace with fresh instance each render for test isolation
-  animatorRef.current = createAnimationController(0, 1000);
-
-  animatorRef.current.setProgressCallback(setDisplayProgress);
-
-  useEffect(() => {
-    const current = animatorRef.current;
-    if (isRunning && !isPaused) {
-      const targetProgress = ((totalDuration - displayTime) / totalDuration) * 100;
-      current.start(targetProgress);
-    } else {
-      current.cancel();
-      const targetProgress = ((totalDuration - displayTime) / totalDuration) * 100;
-      setDisplayProgress(targetProgress);
-    }
-
-    return () => {
-      current.cancel();
-    };
-  }, [displayTime, isRunning, isPaused, totalDuration]);
+  const progress =
+    totalDuration > 0
+      ? Math.min(
+          Math.max(((totalDuration - displayTime) / totalDuration) * 100, 0),
+          100
+        )
+      : 0;
 
   const displayLabel = isTransition
     ? "Almost Done"
@@ -81,8 +62,8 @@ export function Timer({
       <div className="mt-4 w-full">
         <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
-            className="h-full bg-primary-500 transition-all"
-            style={{ width: `${displayProgress}%` }}
+            className="h-full bg-primary-500 transition-[width] duration-1000 ease-linear"
+            style={{ width: `${progress}%` }}
           />
         </div>
       </div>
