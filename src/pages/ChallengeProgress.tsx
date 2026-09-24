@@ -24,9 +24,9 @@ function formatDayDate(dateKey: string): string {
   });
 }
 
-function formatPlankPoints(points: number): string {
+function formatPlankPoints(points: number, isMissed: boolean): string {
   if (points > 0) return `+${points}`;
-  if (points < 0) return `−${Math.abs(points)}`;
+  if (isMissed) return "0";
   return "–";
 }
 
@@ -164,7 +164,7 @@ export function ChallengeProgress() {
                   cy={y(d.runningTotal)}
                   r={d.isToday ? 4 : 2.5}
                   className={
-                    d.plankPoints < 0
+                    d.isMissed
                       ? "fill-red-500"
                       : "fill-primary-500 dark:fill-primary-400"
                   }
@@ -219,14 +219,14 @@ export function ChallengeProgress() {
                 <div className="flex items-center gap-2 text-xs">
                   <span
                     className={`w-9 text-right font-medium ${
-                      d.plankPoints < 0
+                      d.isMissed
                         ? "text-red-500 dark:text-red-400"
                         : d.plankPoints > 0
                           ? "text-primary-600 dark:text-primary-400"
                           : "text-gray-400"
                     }`}
                   >
-                    {formatPlankPoints(d.plankPoints)}
+                    {formatPlankPoints(d.plankPoints, d.isMissed)}
                   </span>
                   {d.routinePoints > 0 && (
                     <span className="w-9 text-right font-medium text-calm-600 dark:text-calm-300">

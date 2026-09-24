@@ -2,13 +2,12 @@
   {
     "id": "plank-30-day",
     "title": "30-Day Plank Challenge",
-    "description": "Hold a 2-minute plank every day for 30 days. Each day is worth 1 point, a missed day costs 0.5. After a miss you can hold 30 extra seconds (worth +0.5 extra) to catch up — until you're back on pace.",
+    "description": "Hold a 2-minute plank every day for 30 days. Each day is worth 1 point, a missed day is worth nothing. After a miss you can hold 30 extra seconds (worth +0.5 extra) to catch up — until you're back on pace.",
     "exerciseId": "plank-hold",
     "totalDays": 30,
     "baseSeconds": 120,
     "bonusSeconds": 30,
     "bonusPoints": 0.5,
-    "missedDayPenalty": 0.5,
     "illustration": "💪"
   }
 ]

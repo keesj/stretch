@@ -165,7 +165,7 @@ export function getChallengeStatus(
       pastScore += points;
       pastCompletedDays += 1;
     } else {
-      pastScore -= challenge.missedDayPenalty;
+      // A missed day earns 0 (no penalty) — it just widens the deficit.
       missedDays += 1;
     }
     cursor = addDays(cursor, 1);
@@ -260,18 +260,11 @@ export function getChallengeProgress(
     const holdSeconds = secondsByDate.get(cursor) ?? 0;
 
     let plankPoints = 0;
-    if (!isFuture) {
-      if (isToday) {
-        // Today is not a miss until it has passed — only a completed hold
-        // counts, keeping this consistent with getChallengeStatus's score.
-        plankPoints =
-          holdSeconds > 0 ? pointsForHold(challenge, holdSeconds) : 0;
-      } else {
-        plankPoints =
-          holdSeconds >= challenge.baseSeconds
-            ? pointsForHold(challenge, holdSeconds)
-            : -challenge.missedDayPenalty;
-      }
+    // A past day without a completed hold is a miss (0 points, no penalty).
+    // Today is not a miss until it has passed.
+    const isMissed = !isFuture && !isToday && holdSeconds < challenge.baseSeconds;
+    if (!isFuture && !isMissed) {
+      plankPoints = holdSeconds > 0 ? pointsForHold(challenge, holdSeconds) : 0;
     }
     const routinePoints = isFuture
       ? 0
@@ -288,6 +281,7 @@ export function getChallengeProgress(
       date: cursor,
       dayNumber,
       plankPoints,
+      isMissed,
       routinePoints,
       totalPoints,
       runningTotal,

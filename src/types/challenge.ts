@@ -9,7 +9,6 @@ export interface Challenge {
   /** Extra seconds that earn the bonus points */
   bonusSeconds: number;
   bonusPoints: number;
-  missedDayPenalty: number;
   illustration: string;
 }
 
@@ -63,8 +62,10 @@ export interface SessionCompletion {
 export interface ChallengeDayDetail {
   date: string;
   dayNumber: number;
-  /** 1 | 1.5 | -0.5 (missed) | 0 (future) */
+  /** 1 | 1.5 | 0 (missed, pending today, or future) */
   plankPoints: number;
+  /** A past day with no completed hold (misses earn 0, not negative) */
+  isMissed: boolean;
   /** +1 per unique routine completed that day */
   routinePoints: number;
   totalPoints: number;

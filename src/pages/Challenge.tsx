@@ -193,9 +193,7 @@ export function Challenge() {
                 </div>
                 <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
                   <span className="text-gray-600 dark:text-gray-300">Missed a day</span>
-                  <span className="font-semibold text-red-500 dark:text-red-400">
-                    −{challenge.missedDayPenalty} pts
-                  </span>
+                  <span className="font-semibold text-gray-500 dark:text-gray-400">0 pts</span>
                 </div>
                 <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
                   <span className="text-gray-600 dark:text-gray-300">

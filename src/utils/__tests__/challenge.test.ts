@@ -25,7 +25,6 @@ const challenge: Challenge = {
   baseSeconds: 120,
   bonusSeconds: 30,
   bonusPoints: 0.5,
-  missedDayPenalty: 0.5,
   illustration: "💪",
 };
 
@@ -104,42 +103,50 @@ describe("getChallengeStatus", () => {
     expect(status.score).toBe(1.5);
   });
 
-  it("penalizes a missed day once it has passed", () => {
+  it("earns no points for a missed day once it has passed", () => {
     // Day 1 done, day 2 missed, now on day 3
     const state = mkState(START, [[START, 120]]);
     const status = getChallengeStatus(challenge, state, onDay(2));
     expect(status.dayNumber).toBe(3);
     expect(status.missedDays).toBe(1);
-    expect(status.score).toBeCloseTo(0.5);
+    expect(status.score).toBeCloseTo(1);
+    expect(status.deficit).toBe(1);
     expect(status.todayDone).toBe(false);
   });
 
-  it("today is not penalized until the next day", () => {
+  it("today is not a miss until the next day", () => {
     const state = mkState(START, [[addDays(START, 1), 120]]);
     const status = getChallengeStatus(challenge, state, onDay(0));
     expect(status.missedDays).toBe(0);
     expect(status.score).toBe(0);
   });
 
-  it("penalizes each missed day when the app is opened after several days", () => {
+  it("counts each missed day when the app is opened after several days", () => {
     const state = mkState(START, [[START, 120]]);
     const status = getChallengeStatus(challenge, state, onDay(4));
     expect(status.missedDays).toBe(3);
-    expect(status.score).toBeCloseTo(-0.5);
+    expect(status.score).toBeCloseTo(1);
+    expect(status.deficit).toBe(3);
   });
 
-  it("a missed day is fully recoverable with three bonus days", () => {
-    // Day 1 done (+1), day 2 missed (−0.5), days 3-5 at 2:30 (+1.5 each)
+  it("a missed day is fully recoverable with two bonus days", () => {
+    // Day 1 done (+1), day 2 missed (0), days 3-4 at 2:30 (+1.5 each)
     const state = mkState(START, [
       [START, 120],
       [addDays(START, 2), 150],
       [addDays(START, 3), 150],
-      [addDays(START, 4), 150],
     ]);
-    const status = getChallengeStatus(challenge, state, onDay(4));
-    expect(status.completedDays).toBe(4);
-    expect(status.missedDays).toBe(1);
-    expect(status.score).toBeCloseTo(5.0);
+
+    const afterFirstBonus = getChallengeStatus(challenge, state, onDay(3));
+    expect(afterFirstBonus.deficit).toBeCloseTo(0.5);
+    expect(afterFirstBonus.bonusAvailable).toBe(true);
+
+    const afterSecondBonus = getChallengeStatus(challenge, state, onDay(4));
+    expect(afterSecondBonus.completedDays).toBe(3);
+    expect(afterSecondBonus.missedDays).toBe(1);
+    expect(afterSecondBonus.score).toBeCloseTo(4);
+    expect(afterSecondBonus.deficit).toBe(0);
+    expect(afterSecondBonus.bonusAvailable).toBe(false);
   });
 
   it("completes after the 30th day has passed", () => {
@@ -160,12 +167,12 @@ describe("getChallengeStatus", () => {
     expect(after.score).toBeCloseTo(30);
   });
 
-  it("completes with a negative score when every day is missed", () => {
+  it("completes with a zero score when every day is missed", () => {
     const state = mkState(START, []);
     const status = getChallengeStatus(challenge, state, onDay(30));
     expect(status.status).toBe("complete");
     expect(status.missedDays).toBe(30);
-    expect(status.score).toBeCloseTo(-15);
+    expect(status.score).toBe(0);
   });
 
   it("ignores holds outside the challenge window", () => {
@@ -188,22 +195,21 @@ describe("recovery bonus availability", () => {
     expect(status.bonusAvailable).toBe(false);
   });
 
-  it("is offered the day after a miss (deficit 1.5)", () => {
+  it("is offered the day after a miss (deficit 1)", () => {
     const state = mkState(START, []);
     const status = getChallengeStatus(challenge, state, onDay(1));
     expect(status.baseline).toBe(1);
-    expect(status.deficit).toBeCloseTo(1.5);
+    expect(status.deficit).toBe(1);
     expect(status.bonusAvailable).toBe(true);
   });
 
   it("stays offered while recovering and stops once the baseline is reached", () => {
-    // Day 1 missed; days 2-4 at 2:30 (+1.5 each)
+    // Day 1 missed; days 2-3 at 2:30 (+1.5 each)
     const d2 = addDays(START, 1);
     const d3 = addDays(START, 2);
-    const d4 = addDays(START, 3);
 
     const afterDay2 = getChallengeStatus(challenge, mkState(START, [[d2, 150]]), onDay(2));
-    expect(afterDay2.deficit).toBeCloseTo(1);
+    expect(afterDay2.deficit).toBeCloseTo(0.5);
     expect(afterDay2.bonusAvailable).toBe(true);
 
     const afterDay3 = getChallengeStatus(
@@ -211,24 +217,14 @@ describe("recovery bonus availability", () => {
       mkState(START, [[d2, 150], [d3, 150]]),
       onDay(3)
     );
-    expect(afterDay3.deficit).toBeCloseTo(0.5);
-    expect(afterDay3.bonusAvailable).toBe(true);
-
-    const afterDay4 = getChallengeStatus(
-      challenge,
-      mkState(START, [[d2, 150], [d3, 150], [d4, 150]]),
-      onDay(4)
-    );
-    expect(afterDay4.deficit).toBeCloseTo(0);
-    expect(afterDay4.bonusAvailable).toBe(false);
+    expect(afterDay3.deficit).toBeCloseTo(0);
+    expect(afterDay3.bonusAvailable).toBe(false);
   });
 
   it("is offered when exactly 2 points behind the baseline", () => {
-    // 15 past days: 11x 2:00, 2x 2:30, 2 missed => 11 + 3 - 1 = 13 (deficit 2)
+    // 15 past days: 13x 2:00, 2 missed => 13 pts (deficit 2)
     const entries: Array<[string, number]> = [];
-    for (let i = 0; i < 11; i++) entries.push([addDays(START, i), 120]);
-    entries.push([addDays(START, 11), 150]);
-    entries.push([addDays(START, 12), 150]);
+    for (let i = 0; i < 13; i++) entries.push([addDays(START, i), 120]);
     const state = mkState(START, entries);
     const status = getChallengeStatus(challenge, state, onDay(15));
     expect(status.baseline).toBe(15);
@@ -238,9 +234,9 @@ describe("recovery bonus availability", () => {
   });
 
   it("is no longer offered more than 2 points behind (out of luck)", () => {
-    // 15 past days: 13x 2:00, 2 missed => 13 - 1 = 12 (deficit 3)
+    // 15 past days: 12x 2:00, 3 missed => 12 pts (deficit 3)
     const entries: Array<[string, number]> = [];
-    for (let i = 0; i < 13; i++) entries.push([addDays(START, i), 120]);
+    for (let i = 0; i < 12; i++) entries.push([addDays(START, i), 120]);
     const state = mkState(START, entries);
     const status = getChallengeStatus(challenge, state, onDay(15));
     expect(status.score).toBeCloseTo(12);
@@ -319,7 +315,7 @@ describe("getChallengeProgress", () => {
     expect(progress.combinedTotal).toBe(4);
   });
 
-  it("counts today as a miss only after the day has passed", () => {
+  it("marks a past day as missed (0 points) only after it has passed", () => {
     // Day 1 completed, day 2 missed; on day 3 the miss is settled
     const state = mkState(START, [[START, 120]]);
     const progress = getChallengeProgress(
@@ -328,8 +324,17 @@ describe("getChallengeProgress", () => {
       [],
       onDay(2)
     );
-    expect(progress.days[1]).toMatchObject({ plankPoints: -0.5 });
-    expect(progress.plankTotal).toBeCloseTo(0.5);
+    expect(progress.days[1]).toMatchObject({
+      plankPoints: 0,
+      isMissed: true,
+    });
+    // Today (day 3) is still pending, not a miss
+    expect(progress.days[2]).toMatchObject({
+      plankPoints: 0,
+      isMissed: false,
+      isToday: true,
+    });
+    expect(progress.plankTotal).toBe(1);
   });
 
   it("ignores routine completions outside the challenge window", () => {

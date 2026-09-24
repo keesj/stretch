@@ -92,7 +92,7 @@ export function ChallengeCard({
       )}
       {phase === "active" && missedDays > 0 && (
         <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Missed days: {missedDays} (−{(missedDays * challenge.missedDayPenalty).toString()} pts)
+          Missed days: {missedDays}
         </div>
       )}
       <div className="space-y-3">

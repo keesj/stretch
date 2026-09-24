@@ -68,16 +68,19 @@ describe('ChallengeProgress page', () => {
       </MemoryRouter>
     );
 
-    // Header + pace (day 1 = two days ago, so today is day 3)
+    // Header + pace (day 1 = two days ago, so today is day 3; one missed
+    // day = 1 point of deficit)
     expect(screen.getByText('Day 3 of 30')).toBeInTheDocument();
-    expect(screen.getByText('1.5 pts behind pace')).toBeInTheDocument();
+    expect(screen.getByText('1 pts behind pace')).toBeInTheDocument();
 
-    // Totals: plank 1 - 0.5 = 0.5 (today is pending, not a miss yet)
-    expect(screen.getByText('0.5')).toBeInTheDocument();
-    // Routines 3: stat card + day 1 row. Combined 3.5: stat card +
+    // Totals: plank 1 (missed days earn 0, today is pending)
+    expect(screen.getByText('1')).toBeInTheDocument();
+    // Routines 3: stat card + day 1 row. Combined 4: stat card +
     // day 2 row + day 3 (today, still pending) row.
     expect(screen.getAllByText('3')).toHaveLength(2);
-    expect(screen.getAllByText('3.5')).toHaveLength(3);
+    expect(screen.getAllByText('4')).toHaveLength(3);
+    // The missed day shows a red 0
+    expect(screen.getByText('0')).toBeInTheDocument();
 
     // Chart is rendered
     expect(container.querySelector('polyline')).toBeInTheDocument();
@@ -85,8 +88,6 @@ describe('ChallengeProgress page', () => {
     // Day rows: day1 +1 plank / +2 unique routines / running 3
     expect(screen.getByText('D1')).toBeInTheDocument();
     expect(screen.getByText('D2')).toBeInTheDocument();
-    // Day 2 is the missed plank day
-    expect(screen.getByText('−0.5')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();
   });
 });
