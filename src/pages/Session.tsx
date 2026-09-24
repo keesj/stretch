@@ -10,6 +10,7 @@ import { useWorkout } from "../hooks/useWorkout";
 import { useBeep } from "../hooks/useBeep";
 import { useWakeLock } from "../hooks/useWakeLock";
 import { Card } from "../components/Card";
+import { loadFromStorage, DEFAULT_SETTINGS } from "../utils/storage";
 import type { Stretch } from "../types/stretch";
 import type { Routine } from "../types/routine";
 
@@ -28,8 +29,14 @@ export function Session() {
   const [showTransitionMessage, setShowTransitionMessage] = useState(false);
   const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
   const countdownCompleteRef = useRef(false);
-  const isTransitioningRef = useRef(false);
-  const lastTickTimeRef = useRef<number>(60);
+  const autoAdvanceRef = useRef(false);
+  const prevCompletedRef = useRef(false);
+  // True once the current exercise's countdown finished and the timer ran
+  // (so "Paused" is shown instead of "Ready" when the user hits Pause).
+  const hasStartedRef = useRef(false);
+  const [soundEnabled] = useState(() =>
+    loadFromStorage("settings", DEFAULT_SETTINGS).soundEnabled
+  );
 
   useEffect(() => {
     try {
@@ -77,37 +84,48 @@ export function Session() {
   const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
     initialTime: currentExercise.duration,
     onComplete: () => {
+      autoAdvanceRef.current = true;
       nextExercise();
     },
   });
 
-  const { playBeep, playFinalBeep } = useBeep(true);
+  const { scheduleBeeps, playHappyBeep } = useBeep(soundEnabled);
   useWakeLock({ isActive: isRunning && !isPaused });
+
+  useEffect(() => {
+    if (isCompleted && !prevCompletedRef.current) {
+      playHappyBeep();
+    }
+    prevCompletedRef.current = isCompleted;
+  }, [isCompleted, playHappyBeep]);
 
   const startCountdown = useCallback(() => {
     if (countdownTimersRef.current) {
       countdownTimersRef.current.forEach(clearTimeout);
       countdownTimersRef.current = null;
     }
-    
+
     countdownCompleteRef.current = false;
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
+    // Schedule all beeps on the Web Audio clock so the 3-2-1 spacing is
+    // sample-accurate instead of riding on setTimeout jitter.
+    scheduleBeeps([
+      { frequency: 800, at: 0, duration: 0.1 },
+      { frequency: 800, at: 1, duration: 0.1 },
+      { frequency: 800, at: 2, duration: 0.1 },
+      { frequency: 1200, at: 3, duration: 0.3 },
+    ]);
 
-    playBeep(800, 0.1);
-    timers.push(setTimeout(() => playBeep(800, 0.1), 1000));
-    timers.push(setTimeout(() => playBeep(800, 0.1), 2000));
-    timers.push(setTimeout(() => {
+    const timer = setTimeout(() => {
       countdownCompleteRef.current = true;
-      isTransitioningRef.current = false;
-      playFinalBeep();
+      hasStartedRef.current = true;
       if (!isCompleted) {
         start();
       }
-    }, 3000));
+    }, 3000);
 
-    countdownTimersRef.current = timers;
-  }, [playBeep, playFinalBeep, start, isCompleted]);
+    countdownTimersRef.current = [timer];
+  }, [scheduleBeeps, start, isCompleted]);
 
   const stopCountdown = useCallback(() => {
     if (countdownTimersRef.current) {
@@ -115,12 +133,10 @@ export function Session() {
       countdownTimersRef.current = null;
     }
     countdownCompleteRef.current = false;
-    isTransitioningRef.current = false;
   }, []);
 
   const goToNext = useCallback(() => {
     if (currentExerciseIndex < totalExercises - 1) {
-      isTransitioningRef.current = true;
       stopCountdown();
       skip();
       nextExercise();
@@ -148,12 +164,14 @@ export function Session() {
       countdownTimersRef.current = null;
     }
     countdownCompleteRef.current = false;
+    hasStartedRef.current = false;
     resetTimer(currentExercise.duration);
-    countdownCompleteRef.current = false;
-    isTransitioningRef.current = false;
-    lastTickTimeRef.current = currentExercise.duration;
 
-    if (currentExerciseIndex > 0 && !isCompleted && !isTransitioningRef.current) {
+    // Only auto-start the next exercise when the previous one finished
+    // naturally (timer hit 0). Manual Next/Prev stays in "Ready".
+    const shouldAutoStart = autoAdvanceRef.current && currentExerciseIndex > 0 && !isCompleted;
+    autoAdvanceRef.current = false;
+    if (shouldAutoStart) {
       startCountdown();
     }
   }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, startCountdown]);
@@ -225,7 +243,10 @@ export function Session() {
         <Timer
           displayTime={timeLeft}
           isRunning={isRunning}
-          isPaused={isPaused}
+          isPaused={
+            isPaused ||
+            (hasStartedRef.current && !isRunning && timeLeft > 0)
+          }
           totalDuration={currentExercise.duration}
           countdownDisplay={showNextPreview ? timeLeft : null}
           isTransitionMessage={showTransitionMessage}

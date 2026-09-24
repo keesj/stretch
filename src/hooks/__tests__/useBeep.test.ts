@@ -48,12 +48,62 @@ function installMockAudioContext(): AudioMocks {
 }
 
 describe('useBeep', () => {
-  it('returns playBeep and playFinalBeep', () => {
+  it('returns playBeep, playFinalBeep, scheduleBeeps and playHappyBeep', () => {
     const { result } = renderHook(() => useBeep(true));
     expect(result.current).toHaveProperty('playBeep');
     expect(result.current).toHaveProperty('playFinalBeep');
+    expect(result.current).toHaveProperty('scheduleBeeps');
+    expect(result.current).toHaveProperty('playHappyBeep');
     expect(typeof result.current.playBeep).toBe('function');
     expect(typeof result.current.playFinalBeep).toBe('function');
+    expect(typeof result.current.scheduleBeeps).toBe('function');
+    expect(typeof result.current.playHappyBeep).toBe('function');
+  });
+
+  it('schedules each beep in a batch on the audio clock', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(true));
+
+    result.current.scheduleBeeps([
+      { frequency: 800, at: 0, duration: 0.1 },
+      { frequency: 800, at: 1, duration: 0.1 },
+      { frequency: 1200, at: 3, duration: 0.3 },
+    ]);
+
+    expect(mocks.createOscillator).toHaveBeenCalledTimes(3);
+    expect(mocks.createGain).toHaveBeenCalledTimes(3);
+    const starts = mocks.createOscillator.mock.results.map((r) => r.value.start);
+    expect(starts[0]).toHaveBeenCalledWith(0);
+    expect(starts[1]).toHaveBeenCalledWith(1);
+    expect(starts[2]).toHaveBeenCalledWith(3);
+  });
+
+  it('does not schedule beeps when disabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(false));
+
+    result.current.scheduleBeeps([{ frequency: 800, at: 0, duration: 0.1 }]);
+
+    expect(mocks.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('plays a 4-note happy arpeggio when enabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(true));
+
+    result.current.playHappyBeep();
+
+    expect(mocks.createOscillator).toHaveBeenCalledTimes(4);
+    expect(mocks.createGain).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not play the happy arpeggio when disabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(false));
+
+    result.current.playHappyBeep();
+
+    expect(mocks.createOscillator).not.toHaveBeenCalled();
   });
 
   it('does not create audio nodes when disabled', () => {

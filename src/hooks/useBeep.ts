@@ -1,5 +1,35 @@
 import { useEffect, useCallback, useRef } from "react";
 
+export interface ScheduledBeep {
+  frequency: number;
+  /** Offset in seconds from now */
+  at: number;
+  duration: number;
+}
+
+function scheduleOnContext(
+  ctx: AudioContext,
+  frequency: number,
+  when: number,
+  duration: number,
+  volume: number
+) {
+  const oscillator = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(ctx.destination);
+
+  oscillator.frequency.value = frequency;
+  oscillator.type = "sine";
+
+  gainNode.gain.setValueAtTime(volume, when);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, when + duration);
+
+  oscillator.start(when);
+  oscillator.stop(when + duration);
+}
+
 export function useBeep(enabled: boolean) {
   const audioContextRef = useRef<AudioContext | null>(null);
 
@@ -36,20 +66,29 @@ export function useBeep(enabled: boolean) {
       if (!ctx) return;
 
       try {
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
+        scheduleOnContext(ctx, frequency, ctx.currentTime, duration, 0.3);
+      } catch {
+        // audio failed — beep silently
+      }
+    },
+    [enabled, getAudioContext]
+  );
 
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
+  /**
+   * Schedule a batch of beeps on the Web Audio clock. Spacing between
+   * beeps is sample-accurate, independent of main-thread timing or
+   * setTimeout drift.
+   */
+  const scheduleBeeps = useCallback(
+    (beeps: ScheduledBeep[]) => {
+      if (!enabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
 
-        oscillator.frequency.value = frequency;
-        oscillator.type = "sine";
-
-        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + duration);
+      try {
+        for (const { frequency, at, duration } of beeps) {
+          scheduleOnContext(ctx, frequency, ctx.currentTime + at, duration, 0.3);
+        }
       } catch {
         // audio failed — beep silently
       }
@@ -63,24 +102,29 @@ export function useBeep(enabled: boolean) {
     if (!ctx) return;
 
     try {
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      oscillator.frequency.value = 1200;
-      oscillator.type = "sine";
-
-      gainNode.gain.setValueAtTime(0.4, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.3);
+      scheduleOnContext(ctx, 1200, ctx.currentTime, 0.3, 0.4);
     } catch {
       // audio failed — beep silently
     }
   }, [enabled, getAudioContext]);
 
-  return { playBeep, playFinalBeep };
+  /** Cheerful ascending arpeggio (C5-E5-G5-C6) for finishing a workout. */
+  const playHappyBeep = useCallback(() => {
+    if (!enabled) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      const step = 0.15;
+      const duration = 0.35;
+      notes.forEach((frequency, index) => {
+        scheduleOnContext(ctx, frequency, ctx.currentTime + index * step, duration, 0.35);
+      });
+    } catch {
+      // audio failed — beep silently
+    }
+  }, [enabled, getAudioContext]);
+
+  return { playBeep, playFinalBeep, scheduleBeeps, playHappyBeep };
 }

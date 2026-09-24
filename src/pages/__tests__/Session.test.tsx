@@ -12,8 +12,16 @@ vi.mock('react-router-dom', async (importOriginal) => {
   };
 });
 
+const mockScheduleBeeps = vi.fn();
+const mockPlayHappyBeep = vi.fn();
+
 vi.mock('../../hooks/useBeep', () => ({
-  useBeep: () => ({ playBeep: vi.fn(), playFinalBeep: vi.fn() }),
+  useBeep: () => ({
+    playBeep: vi.fn(),
+    playFinalBeep: vi.fn(),
+    scheduleBeeps: mockScheduleBeeps,
+    playHappyBeep: mockPlayHappyBeep,
+  }),
 }));
 
 // Mutable state that the mock returns
@@ -21,6 +29,7 @@ const timerState = {
   timeLeft: 60,
   isRunning: false,
   isPaused: false,
+  onCompleteCb: null as null | (() => void),
 };
 const mockStart = vi.fn();
 const mockPause = vi.fn();
@@ -28,29 +37,40 @@ const mockSkip = vi.fn();
 const mockReset = vi.fn();
 
 vi.mock('../../hooks/useTimer', () => ({
-  useTimer: () => ({
-    timeLeft: timerState.timeLeft,
-    isRunning: timerState.isRunning,
-    isPaused: timerState.isPaused,
-    start: mockStart,
-    pause: mockPause,
-    reset: mockReset,
-    skip: mockSkip,
-  }),
+  useTimer: (opts: any) => {
+    if (opts?.onComplete) {
+      timerState.onCompleteCb = opts.onComplete;
+    }
+    return {
+      timeLeft: timerState.timeLeft,
+      isRunning: timerState.isRunning,
+      isPaused: timerState.isPaused,
+      start: mockStart,
+      pause: mockPause,
+      reset: mockReset,
+      skip: mockSkip,
+    };
+  },
 }));
 
-// Mutable workout state
-const workoutState = {
-  currentExercise: {
-    id: 'exercise-1',
-    title: 'Upward Salute',
+function makeExercise(index: number) {
+  return {
+    id: `exercise-${index + 1}`,
+    title: index === 0 ? 'Upward Salute' : `Stretch ${index + 1}`,
     duration: 60,
     instructions: ['Raise arms', 'Hold'],
     bodyParts: ['arms'],
     difficulty: 'beginner',
     illustration: '🤸‍♀️',
     equipment: 'none',
-  },
+  };
+}
+
+const EXERCISES = [0, 1, 2].map(makeExercise);
+
+// Mutable workout state (initial values read at mount time by the mock)
+const workoutState = {
+  exercises: EXERCISES,
   currentExerciseIndex: 0,
   totalExercises: 8,
   isCompleted: false,
@@ -59,23 +79,43 @@ const workoutState = {
   previousExerciseFn: [] as (() => void)[],
   resetFn: [] as (() => void)[],
   onCompleteCb: [] as ((session: any) => void)[],
+  setCompleted: [] as ((completed: boolean) => void)[],
 };
 
-vi.mock('../../hooks/useWorkout', () => ({
-  useWorkout: (opts: any) => {
-    workoutState.onCompleteCb[0] = opts.onComplete;
-    return {
-      currentExercise: workoutState.currentExercise,
-      currentExerciseIndex: workoutState.currentExerciseIndex,
-      totalExercises: workoutState.totalExercises,
-      isCompleted: workoutState.isCompleted,
-      isPaused: workoutState.isPaused,
-      nextExercise: () => { if (workoutState.nextExerciseFn[0]) workoutState.nextExerciseFn[0](); },
-      previousExercise: () => { if (workoutState.previousExerciseFn[0]) workoutState.previousExerciseFn[0](); },
-      reset: () => { if (workoutState.resetFn[0]) workoutState.resetFn[0](); },
-    };
-  },
-}));
+// Stateful mock: navigation actually changes React state so the
+// Session's exercise-change effects run, just like the real hook.
+vi.mock('../../hooks/useWorkout', async () => {
+  const React = await import('react');
+  return {
+    useWorkout: (opts: any) => {
+      const [index, setIndex] = React.useState(workoutState.currentExerciseIndex);
+      const [completed, setCompleted] = React.useState(workoutState.isCompleted);
+      workoutState.onCompleteCb[0] = opts.onComplete;
+      workoutState.setCompleted[0] = setCompleted;
+      const exercises = workoutState.exercises;
+      return {
+        currentExercise: exercises[Math.min(index, exercises.length - 1)],
+        currentExerciseIndex: index,
+        totalExercises: workoutState.totalExercises,
+        isCompleted: completed,
+        isPaused: workoutState.isPaused,
+        nextExercise: () => {
+          if (workoutState.nextExerciseFn[0]) workoutState.nextExerciseFn[0]();
+          setIndex((i) => Math.min(i + 1, workoutState.totalExercises - 1));
+        },
+        previousExercise: () => {
+          if (workoutState.previousExerciseFn[0]) workoutState.previousExerciseFn[0]();
+          setIndex((i) => Math.max(i - 1, 0));
+        },
+        reset: () => {
+          if (workoutState.resetFn[0]) workoutState.resetFn[0]();
+          setIndex(0);
+          setCompleted(false);
+        },
+      };
+    },
+  };
+});
 
 describe('Session exercise transition', () => {
   beforeEach(() => {
@@ -85,9 +125,12 @@ describe('Session exercise transition', () => {
     timerState.timeLeft = 60;
     timerState.isRunning = false;
     timerState.isPaused = false;
+    timerState.onCompleteCb = null;
     mockStart.mockReset();
     mockPause.mockReset();
     mockSkip.mockReset();
+    mockScheduleBeeps.mockReset();
+    mockPlayHappyBeep.mockReset();
     workoutState.currentExerciseIndex = 0;
     workoutState.totalExercises = 8;
     workoutState.isCompleted = false;
@@ -176,6 +219,81 @@ describe('Session exercise transition', () => {
     await userEvent.setup().click(screen.getByText('Next'));
 
     expect(workoutState.nextExerciseFn[0]).toHaveBeenCalled();
+  });
+
+  it('Next button does not auto-start the next exercise', async () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
+    workoutState.totalExercises = 3;
+
+    render(<SessionContainer />);
+
+    await userEvent.setup().click(screen.getByText('Next'));
+
+    expect(screen.getByText('Exercise 2 of 3')).toBeInTheDocument();
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 3100));
+    });
+
+    expect(mockStart).not.toHaveBeenCalled();
+    expect(mockScheduleBeeps).not.toHaveBeenCalled();
+  });
+
+  it('Previous button does not auto-start the previous exercise', async () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
+    workoutState.currentExerciseIndex = 2;
+    workoutState.totalExercises = 3;
+
+    render(<SessionContainer />);
+
+    await userEvent.setup().click(screen.getByText('Previous'));
+
+    expect(screen.getByText('Exercise 2 of 3')).toBeInTheDocument();
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 3100));
+    });
+
+    expect(mockStart).not.toHaveBeenCalled();
+  });
+
+  it('auto-starts the next exercise with a 3-2-1 countdown when the timer completes', async () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
+    workoutState.totalExercises = 3;
+
+    render(<SessionContainer />);
+
+    act(() => {
+      timerState.onCompleteCb?.();
+    });
+
+    expect(screen.getByText('Exercise 2 of 3')).toBeInTheDocument();
+    expect(mockScheduleBeeps).toHaveBeenCalledTimes(1);
+    expect(mockScheduleBeeps).toHaveBeenCalledWith([
+      { frequency: 800, at: 0, duration: 0.1 },
+      { frequency: 800, at: 1, duration: 0.1 },
+      { frequency: 800, at: 2, duration: 0.1 },
+      { frequency: 1200, at: 3, duration: 0.3 },
+    ]);
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 3100));
+    });
+
+    expect(mockStart).toHaveBeenCalled();
+  });
+
+  it('plays the happy beep when the workout completes', async () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
+
+    render(<SessionContainer />);
+    expect(mockPlayHappyBeep).not.toHaveBeenCalled();
+
+    act(() => {
+      workoutState.setCompleted[0]?.(true);
+    });
+
+    expect(mockPlayHappyBeep).toHaveBeenCalledTimes(1);
   });
 
   it('Previous button goes to previous exercise when not on first', async () => {

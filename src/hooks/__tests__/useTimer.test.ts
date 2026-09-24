@@ -82,6 +82,25 @@ describe('useTimer', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
+  it('completes at the exact wall-clock time, not on a tick boundary', () => {
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => useTimer({ initialTime: 2, onComplete }));
+
+    act(() => {
+      result.current.start();
+      vi.advanceTimersByTime(1999);
+    });
+    expect(result.current.timeLeft).toBe(1);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.timeLeft).toBe(0);
+    expect(result.current.isRunning).toBe(false);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
   it('does not restart after completion', () => {
     const onComplete = vi.fn();
     const { result } = renderHook(() => useTimer({ initialTime: 1, onComplete }));

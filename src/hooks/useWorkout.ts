@@ -27,7 +27,10 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   const [isPaused, setIsPaused] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const elapsedRef = useRef(0);
+  // Elapsed seconds banked from finished segments, plus a live segment that
+  // is derived from the wall clock on every tick (no tick-count drift).
+  const accumulatedRef = useRef(0);
+  const segmentStartRef = useRef<number | null>(null);
   const indexRef = useRef(0);
   const isCompletedRef = useRef(false);
   const isPausedRef = useRef(false);
@@ -43,13 +46,26 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
   const currentExercise = stretchesRef.current[currentExerciseIndex];
   const totalExercises = routineRef.current.stretches.length;
 
+  const currentElapsed = useCallback(() => {
+    const live =
+      segmentStartRef.current != null
+        ? Math.floor((Date.now() - segmentStartRef.current) / 1000)
+        : 0;
+    return accumulatedRef.current + live;
+  }, []);
+
   const startTimer = useCallback(() => {
     if (timerRef.current) {
       return;
     }
+    if (segmentStartRef.current == null) {
+      segmentStartRef.current = Date.now();
+    }
     timerRef.current = setInterval(() => {
-      elapsedRef.current += 1;
-      setElapsedSeconds(elapsedRef.current);
+      const start = segmentStartRef.current ?? Date.now();
+      setElapsedSeconds(
+        accumulatedRef.current + Math.floor((Date.now() - start) / 1000)
+      );
     }, 1000);
   }, []);
 
@@ -57,6 +73,12 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (segmentStartRef.current != null) {
+      accumulatedRef.current += Math.floor(
+        (Date.now() - segmentStartRef.current) / 1000
+      );
+      segmentStartRef.current = null;
     }
   }, []);
 
@@ -72,6 +94,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
       return;
     }
     isCompletedRef.current = true;
+    const duration = currentElapsed();
     stopTimer();
     setIsCompleted(true);
 
@@ -79,7 +102,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
       id: generateId(),
       routineId: routineRef.current.id,
       routineTitle: routineRef.current.title,
-      duration: elapsedRef.current,
+      duration,
       completedAt: new Date().toISOString(),
     };
 
@@ -93,7 +116,7 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     if (completeCallbackRef.current) {
       completeCallbackRef.current(completedSession);
     }
-  }, [stopTimer]);
+  }, [currentElapsed, stopTimer]);
 
   const nextExercise = useCallback(() => {
     if (isCompletedRef.current) {
@@ -120,6 +143,8 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
 
   const reset = useCallback(() => {
     stopTimer();
+    accumulatedRef.current = 0;
+    segmentStartRef.current = null;
     startTimer();
     indexRef.current = 0;
     setCurrentExerciseIndex(0);
@@ -127,7 +152,6 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     setIsCompleted(false);
     isPausedRef.current = false;
     setIsPaused(false);
-    elapsedRef.current = 0;
     setElapsedSeconds(0);
   }, [startTimer, stopTimer]);
 
