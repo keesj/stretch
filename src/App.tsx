@@ -3,13 +3,17 @@ import { Home } from "./pages/Home";
 import { Session } from "./pages/Session";
 import { Finished } from "./pages/Finished";
 import { Settings } from "./pages/Settings";
+import { Challenge } from "./pages/Challenge";
+import { ChallengeProgress } from "./pages/ChallengeProgress";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useLocation } from "react-router-dom";
 
+const FULLSCREEN_ROUTES = ["/session", "/challenge"];
+
 function BottomNavWrapper() {
   const location = useLocation();
-  return location.pathname !== "/session" ? <BottomNavigation /> : null;
+  return FULLSCREEN_ROUTES.includes(location.pathname) ? null : <BottomNavigation />;
 }
 
 function App() {
@@ -20,6 +24,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/session" element={<Session />} />
+            <Route path="/challenge" element={<Challenge />} />
+            <Route path="/challenge/progress" element={<ChallengeProgress />} />
             <Route path="/finished" element={<Finished />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

@@ -1,5 +1,20 @@
 [
   {
+    "id": "plank-hold",
+    "title": "Plank Hold",
+    "duration": 120,
+    "instructions": [
+      "Get into a forearm plank",
+      "Elbows directly under your shoulders",
+      "Keep your body in one straight line",
+      "Tighten your core and breathe steadily",
+      "Hold for 2 minutes (30 extra seconds earns bonus points)"
+    ],
+    "bodyParts": ["core", "shoulders", "back"],
+    "difficulty": "medium",
+    "illustration": "💪"
+  },
+  {
     "id": "cat-cow",
     "title": "Cat-Cow Stretch",
     "duration": 60,

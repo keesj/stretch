@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import type { Routine } from "../types/routine";
 import type { Stretch } from "../types/stretch";
 import { RoutineCard } from "../components/RoutineCard";
+import { ChallengeCard } from "../components/ChallengeCard";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import {
@@ -11,9 +12,18 @@ import {
   saveToStorage,
   type CompletedSession,
 } from "../utils/storage";
+import {
+  loadPlankState,
+  startPlankChallenge,
+  getChallengeStatus,
+} from "../utils/challenge";
+import type { Challenge, PlankChallengeState } from "../types/challenge";
 
 import routinesData from "../data/routines.json";
 import stretchesData from "../data/stretches.json";
+import challengesData from "../data/challenges.json";
+
+const challenges = challengesData as Challenge[];
 
 export function Home() {
   const navigate = useNavigate();
@@ -22,6 +32,12 @@ export function Home() {
   const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const completedSessionsRef = useRef<CompletedSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [plankState, setPlankState] = useState<PlankChallengeState>(() =>
+    loadPlankState()
+  );
+
+  const plankChallenge = challenges[0];
+  const plankStatus = getChallengeStatus(plankChallenge, plankState);
 
   useEffect(() => {
     const loadSessions = () => {
@@ -40,6 +56,9 @@ export function Home() {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "completedSessions") {
         loadSessions();
+      }
+      if (e.key === "plankChallenge") {
+        setPlankState(loadPlankState());
       }
     };
 
@@ -76,6 +95,25 @@ export function Home() {
 
   const featuredRoutine = routines[0];
   const otherRoutines = routines.slice(1);
+
+  const handleStartChallenge = () => {
+    setPlankState(startPlankChallenge());
+    navigate("/challenge");
+  };
+
+  const handleBeginChallenge = () => {
+    navigate("/challenge");
+  };
+
+  const handleRestartChallenge = () => {
+    if (
+      typeof confirm === "function" &&
+      confirm("Start a new 30-day challenge? Your current progress will be lost.")
+    ) {
+      setPlankState(startPlankChallenge());
+      navigate("/challenge");
+    }
+  };
 
   return (
     <motion.div
@@ -119,6 +157,24 @@ export function Home() {
           </Card>
         </motion.div>
       )}
+
+      <section className="mb-6">
+        <h2 className="text-lg font-semibold mb-3">Challenges</h2>
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.15 }}
+        >
+          <ChallengeCard
+            challenge={plankChallenge}
+            status={plankStatus}
+            onStart={handleStartChallenge}
+            onBegin={handleBeginChallenge}
+            onRestart={handleRestartChallenge}
+            onProgress={() => navigate("/challenge/progress")}
+          />
+        </motion.div>
+      </section>
 
       <section className="mb-6">
         <h2 className="text-lg font-semibold mb-3">Featured</h2>

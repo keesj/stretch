@@ -43,9 +43,34 @@ describe('Home Page', () => {
     expect(screen.getByText('⚙️ Settings')).toBeInTheDocument();
   });
 
-  it('renders a Start button for every routine', () => {
+  it('renders a Start button for every routine and the challenge', () => {
     render(<MemoryRouter><Home /></MemoryRouter>);
-    expect(screen.getAllByRole('button', { name: /Start/i })).toHaveLength(5);
+    // 1 challenge ("Start Day 1") + 5 routines ("Start")
+    expect(screen.getAllByRole('button', { name: /Start/i })).toHaveLength(6);
+  });
+
+  it('renders the plank challenge card', () => {
+    mockStoredSessions([]);
+    render(<MemoryRouter><Home /></MemoryRouter>);
+
+    expect(screen.getByText('Challenges')).toBeInTheDocument();
+    expect(screen.getByText('30-Day Plank Challenge')).toBeInTheDocument();
+    expect(screen.getByText('Start Day 1')).toBeInTheDocument();
+  });
+
+  it('starts the plank challenge and navigates to /challenge', () => {
+    mockStoredSessions([]);
+    render(<MemoryRouter><Home /></MemoryRouter>);
+
+    fireEvent.click(screen.getByText('Start Day 1'));
+
+    expect(navigateMockRef.fn).toHaveBeenCalledWith('/challenge');
+    const plankCalls = (localStorage.setItem as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([key]) => key === 'plankChallenge'
+    );
+    expect(plankCalls).toHaveLength(1);
+    expect(JSON.parse(plankCalls[0][1])).toMatchObject({ days: [] });
+    expect(JSON.parse(plankCalls[0][1]).startedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('shows session stats when sessions exist', () => {
@@ -73,7 +98,8 @@ describe('Home Page', () => {
     mockStoredSessions([]);
     render(<MemoryRouter><Home /></MemoryRouter>);
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Start/i })[0]);
+    // Index 0 is the challenge's "Start Day 1"; the featured routine is index 1
+    fireEvent.click(screen.getAllByRole('button', { name: /Start/i })[1]);
 
     expect(navigateMockRef.fn).toHaveBeenCalledWith('/session');
     expect(activeSessionSaveCalls()).toHaveLength(1);
@@ -88,7 +114,8 @@ describe('Home Page', () => {
     render(<MemoryRouter><Home /></MemoryRouter>);
 
     // Last routine in the All Routines section
-    fireEvent.click(screen.getAllByRole('button', { name: /Start/i })[4]);
+    // (index 0 is the challenge button, 1 is featured, 2-5 are the rest)
+    fireEvent.click(screen.getAllByRole('button', { name: /Start/i })[5]);
 
     expect(navigateMockRef.fn).toHaveBeenCalledWith('/session');
     expect(JSON.parse(activeSessionSaveCalls()[0][1])).toMatchObject({

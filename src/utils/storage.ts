@@ -3,7 +3,8 @@ export type StorageKey =
   | "streak"
   | "lastSessionDate"
   | "settings"
-  | "activeSession";
+  | "activeSession"
+  | "plankChallenge";
 
 export interface Settings {
   theme: "light" | "dark" | "system";
