@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, renderHook, act } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { Timer } from '../Timer';
 
 describe('Timer', () => {

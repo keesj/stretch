@@ -125,7 +125,7 @@ describe('useWakeLock', () => {
   });
 
   it('releases the wake lock on visibilitychange when hidden', async () => {
-    const { result } = renderHook(() => useWakeLock({ isActive: true }));
+    renderHook(() => useWakeLock({ isActive: true }));
     await act(async () => {});
 
     Object.defineProperty(document, 'hidden', { value: true, writable: true, configurable: true });
@@ -138,7 +138,7 @@ describe('useWakeLock', () => {
   });
 
   it('does not release on visibilitychange when visible', async () => {
-    const { result } = renderHook(() => useWakeLock({ isActive: true }));
+    renderHook(() => useWakeLock({ isActive: true }));
     await act(async () => {});
 
     Object.defineProperty(document, 'hidden', { value: false, writable: true, configurable: true });

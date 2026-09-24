@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { Card } from '../Card';
 
 describe('Card', () => {
@@ -17,12 +16,7 @@ describe('Card', () => {
   it('is clickable when onClick is provided', () => {
     const onClick = vi.fn();
     render(<Card onClick={onClick}>Click me</Card>);
-    const card = screen.getByText('Click me').closest('[role="presentation"]') || screen.getByText('Click me');
-    
-    // Check the actual div element
-    const cardEl = card?.parentElement?.parentElement;
-    
-    // Either way, the onClick should be on the card div
+    // The onClick should be on the card div
     const allCards = document.querySelectorAll('.card');
     allCards[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
     

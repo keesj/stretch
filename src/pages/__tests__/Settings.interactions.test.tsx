@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import * as useTimerModule from '../../hooks/useTimer';
-import * as useWorkoutModule from '../../hooks/useWorkout';
-import * as useBeepModule from '../../hooks/useBeep';
-import * as useWakeLockModule from '../../hooks/useWakeLock';
 import { Settings } from '../Settings';
 
 vi.mock('react-router-dom', async (importOriginal) => {

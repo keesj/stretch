@@ -1,27 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { loadFromStorage, saveToStorage, clearStorage, DEFAULT_SETTINGS } from '../storage';
+import { describe, it, expect, vi } from 'vitest';
+import { loadFromStorage, saveToStorage, clearStorage } from '../storage';
 import type { StorageKey, Settings } from '../storage';
 
-// Helper to get real localStorage by restoring it from an accessible copy
-const getRealStorage = () => {
-  // Access the prototype's native localStorage
-  return localStorage;
-};
-
 describe('utils/storage', () => {
-  let realStorage: Storage;
-
-  beforeEach(() => {
-    // Capture and restore real localStorage
-    const { localStorage: real } = globalThis;
-    // Store the real DOM localStorage from the prototype
-    realStorage = Object.getPrototypeOf(document.createElement('div') as unknown as { nodeType: number }).constructor.prototype.hasOwnProperty('localStorage')
-      ? (window as any).__testStorage || null
-      : null;
-    // We'll use a manual approach instead
-    realStorage = null as any;
-  });
-
   it('loadFromStorage returns parsed value when key exists', () => {
     // The mock from setup.ts is vi.fn()-based, so we need to set the value on it
     const mockValue = JSON.stringify({ foo: 'bar' });
