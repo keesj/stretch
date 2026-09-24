@@ -57,6 +57,20 @@ describe('Settings Page', () => {
     expect(screen.getByText('Haptic Feedback')).toBeInTheDocument();
   });
 
+  it('shows the build date in the About section', () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    expect(screen.getByText('About')).toBeInTheDocument();
+    const row = screen.getByText('Build date').closest('.flex')!;
+    const texts = within(row)
+      .getAllByText(/.+/)
+      .map((el) => el.textContent ?? '');
+    const label = texts.find((t) => t !== 'Build date');
+    expect(label).toBeTruthy();
+    expect(label).not.toBe('Unknown');
+    expect(label).toMatch(/\d{4}/);
+  });
+
   it('renders Reset Progress and Done buttons', () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
     expect(screen.getByText('Reset Progress')).toBeInTheDocument();
@@ -96,7 +110,7 @@ describe('Settings Page', () => {
     expect(localStorage.removeItem).not.toHaveBeenCalled();
   });
 
-  it('clears completed sessions when the reset is confirmed', async () => {
+  it('clears completed sessions and the plank challenge when the reset is confirmed', async () => {
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
     vi.stubGlobal('alert', vi.fn());
 
@@ -106,6 +120,7 @@ describe('Settings Page', () => {
     await user.click(screen.getByText('Reset Progress'));
 
     expect(localStorage.removeItem).toHaveBeenCalledWith('completedSessions');
+    expect(localStorage.removeItem).toHaveBeenCalledWith('plankChallenge');
   });
 
   it('persists the sound preference when the toggle changes', () => {

@@ -7,6 +7,7 @@ import { useTheme } from "../hooks/useTheme";
 import {
   loadFromStorage,
   saveToStorage,
+  clearStorage,
   DEFAULT_SETTINGS,
   type Settings,
   type CompletedSession,
@@ -56,8 +57,10 @@ export function Settings() {
   }
 
   const handleResetProgress = () => {
-    if (typeof confirm === "function" && confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
-      try { localStorage.removeItem("completedSessions"); } catch { /* storage unavailable */ }
+    if (typeof confirm === "function" && confirm("Are you sure you want to reset all progress, including challenges? This cannot be undone.")) {
+      // clearStorage swallows storage errors itself
+      clearStorage("completedSessions");
+      clearStorage("plankChallenge");
       setCompletedSessions([]);
       if (typeof alert === "function") alert("Progress has been reset.");
     }
@@ -69,6 +72,18 @@ export function Settings() {
 
   const totalSessions = completedSessionsRef.current.length;
   const totalMinutes = completedSessionsRef.current.reduce((sum, s) => sum + s.duration, 0);
+
+  const buildDateLabel = (() => {
+    try {
+      return new Date(__BUILD_DATE__).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return "Unknown";
+    }
+  })();
 
   return (
     <motion.div
@@ -149,6 +164,16 @@ export function Settings() {
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Total Time</span>
               <span className="font-medium">{Math.floor(totalMinutes / 60)} min</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <h2 className="text-lg font-semibold mb-4">About</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Build date</span>
+              <span className="font-medium">{buildDateLabel}</span>
             </div>
           </div>
         </Card>
