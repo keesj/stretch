@@ -4,6 +4,8 @@ interface TimerProps {
   displayTime: number;
   isRunning: boolean;
   isPaused: boolean;
+  /** Show a 3-2-1 start countdown instead of the timer */
+  isCounting?: boolean;
   totalDuration?: number;
   countdownDisplay?: number | null;
   isTransitionMessage?: boolean;
@@ -13,11 +15,12 @@ export function Timer({
   displayTime,
   isRunning,
   isPaused,
+  isCounting = false,
   totalDuration = 60,
   countdownDisplay = null,
   isTransitionMessage = false,
 }: TimerProps) {
-  const isTransition = isTransitionMessage;
+  const isTransition = !isCounting && isTransitionMessage;
 
   const displayText = isTransition
     ? countdownDisplay ?? displayTime
@@ -33,14 +36,16 @@ export function Timer({
 
   const displayLabel = isTransition
     ? "Almost Done"
+    : isCounting
+    ? "Get ready…"
     : isPaused
     ? "Paused"
     : isRunning
     ? "Running"
     : "Ready";
 
-  const textStyle = isTransition
-    ? "text-primary-600"
+  const textStyle = isTransition || isCounting
+    ? "text-primary-600 dark:text-primary-400"
     : isPaused
     ? "text-primary-400"
     : "text-gray-800 dark:text-gray-100";
@@ -59,14 +64,16 @@ export function Timer({
       <div className="mt-2 text-sm font-medium text-gray-400">
         {displayLabel}
       </div>
-      <div className="mt-4 w-full">
-        <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary-500 transition-[width] duration-1000 ease-linear"
-            style={{ width: `${progress}%` }}
-          />
+      {!isCounting && (
+        <div className="mt-4 w-full">
+          <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-500 transition-[width] duration-1000 ease-linear"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

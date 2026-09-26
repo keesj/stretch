@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Session } from '../Session';
@@ -14,6 +14,10 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 const mockScheduleBeeps = vi.fn();
 const mockPlayHappyBeep = vi.fn();
+// Stable identity — a fresh getClock per render would change
+// startCountdown's identity, re-run the exercise-change effect and
+// cancel the countdown right after it starts.
+const mockGetClock = vi.fn(() => performance.now() / 1000);
 
 vi.mock('../../hooks/useBeep', () => ({
   useBeep: () => ({
@@ -21,6 +25,7 @@ vi.mock('../../hooks/useBeep', () => ({
     playFinalBeep: vi.fn(),
     scheduleBeeps: mockScheduleBeeps,
     playHappyBeep: mockPlayHappyBeep,
+    getClock: mockGetClock,
   }),
 }));
 
@@ -117,6 +122,21 @@ vi.mock('../../hooks/useWorkout', async () => {
   };
 });
 
+/**
+ * Wait real milliseconds OUTSIDE of act(). The page's countdown timers
+ * call setState, and updates scheduled inside an async act() are dropped
+ * in this environment — letting React process them normally (with the act
+ * environment flag off to keep the output clean) is what mirrors real use.
+ */
+async function waitMs(ms: number) {
+  (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = false;
+  try {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  } finally {
+    (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+  }
+}
+
 describe('Session exercise transition', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -131,6 +151,7 @@ describe('Session exercise transition', () => {
     mockSkip.mockReset();
     mockScheduleBeeps.mockReset();
     mockPlayHappyBeep.mockReset();
+    mockGetClock.mockImplementation(() => performance.now() / 1000);
     workoutState.currentExerciseIndex = 0;
     workoutState.totalExercises = 8;
     workoutState.isCompleted = false;
@@ -199,6 +220,26 @@ describe('Session exercise transition', () => {
   
     expect(mockStart).toHaveBeenCalled();
   });
+
+  it('shows a 3-2-1 countdown before the exercise starts', async () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
+
+    render(<SessionContainer />);
+    await userEvent.setup().click(screen.getByText('Start'));
+
+    expect(screen.getByText('Get ready…')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+
+    // rAF-driven countdown: ~3s outside act so state updates land normally
+    await waitMs(3200);
+
+    expect(mockStart).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByText('Get ready…')).not.toBeInTheDocument()
+    );
+    // Back to the exercise timer
+    expect(screen.getByText('60')).toBeInTheDocument();
+  }, 20000);
 
   it('toggle to Pause when running', async () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));

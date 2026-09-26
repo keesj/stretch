@@ -96,6 +96,26 @@ export function useBeep(enabled: boolean) {
     [enabled, getAudioContext]
   );
 
+  /**
+   * Current time on the same clock the beeps are scheduled on
+   * (Web Audio clock), falling back to performance.now() when no
+   * AudioContext is available. Lets visual elements (like a 3-2-1
+   * countdown) stay in sync with the sound.
+   */
+  const getClock = useCallback((): number => {
+    // Reuse the context if one exists (same clock as the beeps); never
+    // create one just for timing.
+    const ctx = audioContextRef.current;
+    if (ctx) {
+      try {
+        return ctx.currentTime;
+      } catch {
+        // fall through to performance clock
+      }
+    }
+    return performance.now() / 1000;
+  }, []);
+
   const playFinalBeep = useCallback(() => {
     if (!enabled) return;
     const ctx = getAudioContext();
@@ -126,5 +146,5 @@ export function useBeep(enabled: boolean) {
     }
   }, [enabled, getAudioContext]);
 
-  return { playBeep, playFinalBeep, scheduleBeeps, playHappyBeep };
+  return { playBeep, playFinalBeep, scheduleBeeps, playHappyBeep, getClock };
 }

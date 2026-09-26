@@ -27,13 +27,23 @@ export function Session() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showNextPreview, setShowNextPreview] = useState(false);
   const [showTransitionMessage, setShowTransitionMessage] = useState(false);
-  const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
+  const countdownRafRef = useRef<number | null>(null);
   const countdownCompleteRef = useRef(false);
   const autoAdvanceRef = useRef(false);
   const prevCompletedRef = useRef(false);
   // True once the current exercise's countdown finished and the timer ran
   // (so "Paused" is shown instead of "Ready" when the user hits Pause).
   const hasStartedRef = useRef(false);
+  // 3-2-1 shown while the start countdown runs (null otherwise)
+  const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
+
+  const cancelCountdown = useCallback(() => {
+    if (countdownRafRef.current != null) {
+      cancelAnimationFrame(countdownRafRef.current);
+      countdownRafRef.current = null;
+    }
+    setCountdownNumber(null);
+  }, []);
   const [soundEnabled] = useState(() =>
     loadFromStorage("settings", DEFAULT_SETTINGS).soundEnabled
   );
@@ -89,8 +99,8 @@ export function Session() {
     },
   });
 
-  const { scheduleBeeps, playHappyBeep } = useBeep(soundEnabled);
-  useWakeLock({ isActive: isRunning && !isPaused });
+  const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
+  useWakeLock({ isActive: isRunning && !isPaused || countdownNumber != null });
 
   useEffect(() => {
     if (isCompleted && !prevCompletedRef.current) {
@@ -100,12 +110,10 @@ export function Session() {
   }, [isCompleted, playHappyBeep]);
 
   const startCountdown = useCallback(() => {
-    if (countdownTimersRef.current) {
-      countdownTimersRef.current.forEach(clearTimeout);
-      countdownTimersRef.current = null;
-    }
+    cancelCountdown();
 
     countdownCompleteRef.current = false;
+    setCountdownNumber(3);
 
     // Schedule all beeps on the Web Audio clock so the 3-2-1 spacing is
     // sample-accurate instead of riding on setTimeout jitter.
@@ -116,24 +124,36 @@ export function Session() {
       { frequency: 1200, at: 3, duration: 0.3 },
     ]);
 
-    const timer = setTimeout(() => {
-      countdownCompleteRef.current = true;
-      hasStartedRef.current = true;
-      if (!isCompleted) {
-        start();
-      }
-    }, 3000);
+    // Derive the countdown from the clock every frame (same clock family
+    // as the beeps) so the numbers and the start stay in sync with the
+    // sound and self-correct after dropped frames.
+    const t0 = getClock();
+    const t0Perf = performance.now() / 1000;
+    const elapsedAt = () =>
+      Math.max(getClock() - t0, performance.now() / 1000 - t0Perf);
 
-    countdownTimersRef.current = [timer];
-  }, [scheduleBeeps, start, isCompleted]);
+    const tick = () => {
+      const elapsed = elapsedAt();
+      if (elapsed >= 3) {
+        countdownRafRef.current = null;
+        setCountdownNumber(null);
+        countdownCompleteRef.current = true;
+        hasStartedRef.current = true;
+        if (!isCompleted) {
+          start();
+        }
+        return;
+      }
+      setCountdownNumber(Math.max(3 - Math.floor(elapsed), 1));
+      countdownRafRef.current = requestAnimationFrame(tick);
+    };
+    countdownRafRef.current = requestAnimationFrame(tick);
+  }, [cancelCountdown, scheduleBeeps, getClock, start, isCompleted]);
 
   const stopCountdown = useCallback(() => {
-    if (countdownTimersRef.current) {
-      countdownTimersRef.current.forEach(clearTimeout);
-      countdownTimersRef.current = null;
-    }
+    cancelCountdown();
     countdownCompleteRef.current = false;
-  }, []);
+  }, [cancelCountdown]);
 
   const goToNext = useCallback(() => {
     if (currentExerciseIndex < totalExercises - 1) {
@@ -159,11 +179,7 @@ export function Session() {
   }, [isRunning, pause, startCountdown]);
 
   useEffect(() => {
-    if (countdownTimersRef.current) {
-      countdownTimersRef.current.forEach(clearTimeout);
-      countdownTimersRef.current = null;
-    }
-    countdownCompleteRef.current = false;
+    stopCountdown();
     hasStartedRef.current = false;
     resetTimer(currentExercise.duration);
 
@@ -174,7 +190,7 @@ export function Session() {
     if (shouldAutoStart) {
       startCountdown();
     }
-  }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, startCountdown]);
+  }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, startCountdown, stopCountdown]);
 
   useEffect(() => {
     if (!isPaused && !isCompleted && timeLeft <= 8 && currentExerciseIndex < totalExercises - 1) {
@@ -191,6 +207,8 @@ export function Session() {
       setShowNextPreview(false);
     }
   }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
+
+  useEffect(() => cancelCountdown, [cancelCountdown]);
 
   const handleReturnHome = useCallback(() => {
     stopCountdown();
@@ -241,8 +259,9 @@ export function Session() {
 
       <div className="my-8">
         <Timer
-          displayTime={timeLeft}
+          displayTime={countdownNumber ?? timeLeft}
           isRunning={isRunning}
+          isCounting={countdownNumber != null}
           isPaused={
             isPaused ||
             (hasStartedRef.current && !isRunning && timeLeft > 0)

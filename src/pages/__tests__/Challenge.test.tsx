@@ -16,6 +16,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 const mockScheduleBeeps = vi.fn();
 const mockPlayBeep = vi.fn();
 const mockPlayHappyBeep = vi.fn();
+const mockGetClock = vi.fn(() => performance.now() / 1000);
 
 vi.mock('../../hooks/useBeep', () => ({
   useBeep: () => ({
@@ -23,6 +24,7 @@ vi.mock('../../hooks/useBeep', () => ({
     playFinalBeep: vi.fn(),
     scheduleBeeps: mockScheduleBeeps,
     playHappyBeep: mockPlayHappyBeep,
+    getClock: mockGetClock,
   }),
 }));
 
@@ -101,6 +103,7 @@ describe('Challenge page', () => {
     mockScheduleBeeps.mockReset();
     mockPlayBeep.mockReset();
     mockPlayHappyBeep.mockReset();
+    mockGetClock.mockImplementation(() => performance.now() / 1000);
   });
 
   it('shows the intro when the challenge has not been started', () => {

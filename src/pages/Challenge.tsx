@@ -50,11 +50,18 @@ export function Challenge() {
   phaseRef.current = phase;
 
   const [countNumber, setCountNumber] = useState(3);
-  const countdownTimeoutsRef = useRef<ReturnType<typeof setTimeout>[] | null>(null);
+  const countdownRafRef = useRef<number | null>(null);
   const [breathingIn, setBreathingIn] = useState(true);
   const [holdSeconds, setHoldSeconds] = useState(challenge.baseSeconds);
 
-  const { scheduleBeeps, playHappyBeep } = useBeep(soundEnabled);
+  const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
+
+  const cancelCountdown = useCallback(() => {
+    if (countdownRafRef.current != null) {
+      cancelAnimationFrame(countdownRafRef.current);
+      countdownRafRef.current = null;
+    }
+  }, []);
 
   const handleHoldComplete = useCallback(() => {
     if (phaseRef.current === "holding") {
@@ -71,14 +78,7 @@ export function Challenge() {
 
   useWakeLock({ isActive: isRunning || phase === "countdown" });
 
-  useEffect(() => {
-    return () => {
-      if (countdownTimeoutsRef.current) {
-        countdownTimeoutsRef.current.forEach(clearTimeout);
-        countdownTimeoutsRef.current = null;
-      }
-    };
-  }, []);
+  useEffect(() => cancelCountdown, [cancelCountdown]);
 
   // Breathing cue: 4s in / 4s out while actively holding
   useEffect(() => {
@@ -90,9 +90,7 @@ export function Challenge() {
 
   const beginHold = useCallback(
     (seconds: number) => {
-      if (countdownTimeoutsRef.current) {
-        countdownTimeoutsRef.current.forEach(clearTimeout);
-      }
+      cancelCountdown();
       setHoldSeconds(seconds);
       setCountNumber(3);
       setPhase("countdown");
@@ -106,19 +104,29 @@ export function Challenge() {
         ...ticks.map((at) => ({ frequency: 560, at: at + 3, duration: 0.08 })),
       ]);
 
-      const timeouts: ReturnType<typeof setTimeout>[] = [];
-      timeouts.push(setTimeout(() => setCountNumber(2), 1000));
-      timeouts.push(setTimeout(() => setCountNumber(1), 2000));
-      timeouts.push(
-        setTimeout(() => {
+      // Derive the countdown from the clock every frame instead of
+      // stacking setTimeouts: the numbers stay in sync with the beeps
+      // (same clock family) and self-correct after dropped frames.
+      const t0 = getClock();
+      const t0Perf = performance.now() / 1000;
+      const elapsedAt = () =>
+        Math.max(getClock() - t0, performance.now() / 1000 - t0Perf);
+
+      const tick = () => {
+        const elapsed = elapsedAt();
+        if (elapsed >= 3) {
+          countdownRafRef.current = null;
           resetTimer(seconds);
           start();
           setPhase("holding");
-        }, 3000)
-      );
-      countdownTimeoutsRef.current = timeouts;
+          return;
+        }
+        setCountNumber(Math.max(3 - Math.floor(elapsed), 1));
+        countdownRafRef.current = requestAnimationFrame(tick);
+      };
+      countdownRafRef.current = requestAnimationFrame(tick);
     },
-    [scheduleBeeps, resetTimer, start]
+    [cancelCountdown, scheduleBeeps, getClock, resetTimer, start]
   );
 
   const handleStartChallenge = useCallback(() => {
@@ -127,12 +135,9 @@ export function Challenge() {
   }, []);
 
   const handleBack = useCallback(() => {
-    if (countdownTimeoutsRef.current) {
-      countdownTimeoutsRef.current.forEach(clearTimeout);
-      countdownTimeoutsRef.current = null;
-    }
+    cancelCountdown();
     navigate("/");
-  }, [navigate]);
+  }, [cancelCountdown, navigate]);
 
   const total = holdSeconds;
   const progress = total > 0 ? Math.min(Math.max((total - timeLeft) / total, 0), 1) : 0;

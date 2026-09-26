@@ -75,6 +75,14 @@ describe('Timer', () => {
     expect(screen.queryByText('8')).not.toBeInTheDocument();
   });
 
+  it('shows the 3-2-1 countdown with "Get ready…" while counting', () => {
+    const { container } = render(<Timer displayTime={3} isRunning={false} isPaused={false} isCounting />);
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('Get ready…')).toBeInTheDocument();
+    // Progress bar is hidden during the countdown
+    expect(container.querySelector('.h-1')).not.toBeInTheDocument();
+  });
+
   it('renders progress bar', () => {
     const { container } = render(<Timer displayTime={60} isRunning={false} isPaused={false} />);
     const progressBar = container.querySelector('.h-1');
