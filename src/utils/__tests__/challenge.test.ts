@@ -96,6 +96,16 @@ describe("getChallengeStatus", () => {
     expect(status.missedDays).toBe(0);
   });
 
+  it("stops counting today once it is done", () => {
+    const pending = getChallengeStatus(challenge, mkState(START, []), onDay(0));
+    expect(pending.daysLeft).toBe(30);
+
+    const done = getChallengeStatus(challenge, mkState(START, [[START, 120]]), onDay(0));
+    expect(done.dayNumber).toBe(1);
+    expect(done.todayDone).toBe(true);
+    expect(done.daysLeft).toBe(29);
+  });
+
   it("scores a bonus day at 1.5", () => {
     const state = mkState(START, [[START, 150]]);
     const status = getChallengeStatus(challenge, state, onDay(0));
@@ -159,8 +169,15 @@ describe("getChallengeStatus", () => {
     const lastDay = getChallengeStatus(challenge, state, onDay(29));
     expect(lastDay.status).toBe("active");
     expect(lastDay.dayNumber).toBe(30);
-    expect(lastDay.daysLeft).toBe(1);
+    expect(lastDay.daysLeft).toBe(0);
     expect(lastDay.score).toBeCloseTo(30);
+
+    const lastDayPending = getChallengeStatus(
+      challenge,
+      mkState(START, allDays.slice(0, 29)),
+      onDay(29)
+    );
+    expect(lastDayPending.daysLeft).toBe(1);
 
     const after = getChallengeStatus(challenge, state, onDay(30));
     expect(after.status).toBe("complete");

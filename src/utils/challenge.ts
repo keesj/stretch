@@ -189,7 +189,10 @@ export function getChallengeStatus(
   return {
     status: today > end ? "complete" : "active",
     dayNumber,
-    daysLeft: Math.max(challenge.totalDays - dayNumber + 1, 0),
+    daysLeft: Math.max(
+      challenge.totalDays - dayNumber + (todayPoints > 0 ? 0 : 1),
+      0
+    ),
     todayDone: todayPoints > 0,
     todaySeconds,
     todayPoints,

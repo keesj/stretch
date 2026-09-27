@@ -29,6 +29,7 @@ export interface ChallengeStatus {
   status: "not-started" | "active" | "complete";
   /** 1-based current day within the challenge window */
   dayNumber: number;
+  /** Days still needing a hold; today counts until it is done */
   daysLeft: number;
   todayDone: boolean;
   todaySeconds: number;

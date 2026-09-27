@@ -345,7 +345,9 @@ export function Challenge() {
                 transition={{ type: "spring", stiffness: 200, damping: 12 }}
                 className="text-7xl mb-4"
               >
-                {status.status === "complete" ? "🏆" : "🌅"}
+                {status.status === "complete" || status.daysLeft === 0
+                  ? "🏆"
+                  : "🌅"}
               </motion.div>
               <h1 className="text-3xl font-bold mb-2">
                 Day {status.dayNumber} complete!
@@ -357,7 +359,7 @@ export function Challenge() {
                 Total score: {status.score} pts
               </div>
               <div className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs">
-                {status.status === "complete"
+                {status.status === "complete" || status.daysLeft === 0
                   ? "You finished the 30-day challenge. Amazing work!"
                   : `${status.daysLeft} day${status.daysLeft === 1 ? "" : "s"} to go. Come back tomorrow!`}
               </div>
