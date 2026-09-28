@@ -6,6 +6,7 @@ export function BottomNavigation() {
   const navItems = [
     { to: "/", label: "Home", icon: "🏠" },
     { to: "/session", label: "Session", icon: "⏱️" },
+    { to: "/progress", label: "Progress", icon: "📈" },
     { to: "/settings", label: "Settings", icon: "⚙️" },
   ];
 

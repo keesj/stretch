@@ -44,11 +44,12 @@ describe('ChallengeProgress page', () => {
     expect(screen.getByText('Start Challenge')).toBeInTheDocument();
   });
 
-  it('shows per-day plank and routine points with a running total', () => {
+  it('shows per-day plank points with a running total, ignoring routines', () => {
     const today = todayKey();
     const day1 = addDays(today, -2);
     const day2 = addDays(today, -1);
 
+    // Routine sessions exist but must not appear on this (plank-only) page
     setStorage({
       plankChallenge: JSON.stringify({
         startedAt: day1,
@@ -56,9 +57,7 @@ describe('ChallengeProgress page', () => {
       }),
       completedSessions: JSON.stringify([
         { id: 's1', routineId: 'wake-up-workout', routineTitle: 'Wake Up', duration: 10, completedAt: iso(day1, 8) },
-        { id: 's2', routineId: 'wake-up-workout', routineTitle: 'Wake Up', duration: 10, completedAt: iso(day1, 9) },
-        { id: 's3', routineId: 'midday-decompress', routineTitle: 'Midday', duration: 10, completedAt: iso(day1, 12) },
-        { id: 's4', routineId: 'evening-unwind', routineTitle: 'Evening', duration: 10, completedAt: iso(day2, 19) },
+        { id: 's2', routineId: 'evening-unwind', routineTitle: 'Evening', duration: 10, completedAt: iso(day2, 19) },
       ]),
     });
 
@@ -73,19 +72,18 @@ describe('ChallengeProgress page', () => {
     expect(screen.getByText('Day 3 of 30')).toBeInTheDocument();
     expect(screen.getByText('1 pts behind pace')).toBeInTheDocument();
 
-    // Totals: plank 1 (missed days earn 0, today is pending)
-    expect(screen.getByText('1')).toBeInTheDocument();
-    // Routines 3: stat card + day 1 row. Combined 4: stat card +
-    // day 2 row + day 3 (today, still pending) row.
-    expect(screen.getAllByText('3')).toHaveLength(2);
-    expect(screen.getAllByText('4')).toHaveLength(3);
+    // Plank only: the stat card (1) plus the running total (1) shown on
+    // the day 1, day 2 and today rows
+    expect(screen.getAllByText('1')).toHaveLength(4);
     // The missed day shows a red 0
     expect(screen.getByText('0')).toBeInTheDocument();
+    // No routine column values
+    expect(screen.queryByText('+2')).not.toBeInTheDocument();
 
     // Chart is rendered
     expect(container.querySelector('polyline')).toBeInTheDocument();
 
-    // Day rows: day1 +1 plank / +2 unique routines / running 3
+    // Day rows
     expect(screen.getByText('D1')).toBeInTheDocument();
     expect(screen.getByText('D2')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();

@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "../components/Button";
-import { loadFromStorage, type CompletedSession } from "../utils/storage";
 import {
   loadPlankState,
   getChallengeStatus,
@@ -40,12 +39,7 @@ export function ChallengeProgress() {
     [challenge, plankState]
   );
   const progress = useMemo(() => {
-    const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
-    const completions = sessions.map((s) => ({
-      routineId: s.routineId,
-      completedAt: s.completedAt,
-    }));
-    return getChallengeProgress(challenge, plankState, completions);
+    return getChallengeProgress(challenge, plankState);
   }, [challenge, plankState]);
 
   const days = progress.days;
@@ -106,26 +100,14 @@ export function ChallengeProgress() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mb-6">
+          <div className="mb-6">
             <div className="bg-white/60 dark:bg-gray-800/60 rounded-xl p-3 text-center">
               <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">
                 {progress.plankTotal}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Plank</div>
-            </div>
-            <div className="bg-white/60 dark:bg-gray-800/60 rounded-xl p-3 text-center">
-              <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                {progress.routineTotal}
-              </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                Routines
+                Plank points
               </div>
-            </div>
-            <div className="bg-primary-500 dark:bg-primary-600 rounded-xl p-3 text-center">
-              <div className="text-2xl font-bold text-white">
-                {progress.combinedTotal}
-              </div>
-              <div className="text-xs text-primary-100">Total</div>
             </div>
           </div>
 
@@ -228,11 +210,6 @@ export function ChallengeProgress() {
                   >
                     {formatPlankPoints(d.plankPoints, d.isMissed)}
                   </span>
-                  {d.routinePoints > 0 && (
-                    <span className="w-9 text-right font-medium text-calm-600 dark:text-calm-300">
-                      +{d.routinePoints}
-                    </span>
-                  )}
                   <span className="w-11 text-right font-bold text-gray-800 dark:text-gray-100">
                     {d.runningTotal}
                   </span>

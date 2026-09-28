@@ -53,13 +53,7 @@ export interface ChallengeStatus {
 /** Beyond this deficit the +30s recovery hold is no longer offered */
 export const MAX_RECOVERY_DEFICIT = 2;
 
-/** A routine completion, as recorded in completedSessions */
-export interface SessionCompletion {
-  routineId: string;
-  completedAt: string;
-}
-
-/** One day in the combined (plank + routines) point history */
+/** One day in the plank point history within the challenge window */
 export interface ChallengeDayDetail {
   date: string;
   dayNumber: number;
@@ -67,10 +61,7 @@ export interface ChallengeDayDetail {
   plankPoints: number;
   /** A past day with no completed hold (misses earn 0, not negative) */
   isMissed: boolean;
-  /** +1 per unique routine completed that day */
-  routinePoints: number;
-  totalPoints: number;
-  /** Combined points accumulated through this day */
+  /** Plank points accumulated through this day */
   runningTotal: number;
   isToday: boolean;
   isFuture: boolean;
@@ -80,6 +71,33 @@ export interface ChallengeProgress {
   started: boolean;
   days: ChallengeDayDetail[];
   plankTotal: number;
-  routineTotal: number;
-  combinedTotal: number;
+}
+
+/** Points earned on a single day, split by source */
+export interface PointsBreakdown {
+  plank: number;
+  routine: number;
+  total: number;
+}
+
+/** All-time point totals across planks and routines */
+export interface OverallTotals {
+  plank: number;
+  routine: number;
+  total: number;
+}
+
+/** One bar in the month chart: one day */
+export interface MonthDayBar {
+  date: string;
+  dayOfMonth: number;
+  points: number;
+  isToday: boolean;
+}
+
+/** One bar in the year chart: one Monday-start week */
+export interface YearWeekBar {
+  weekStart: string;
+  weekNumber: number;
+  points: number;
 }

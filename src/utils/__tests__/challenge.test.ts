@@ -13,7 +13,6 @@ import {
 import type {
   Challenge,
   PlankChallengeState,
-  SessionCompletion,
 } from "../../types/challenge";
 
 const challenge: Challenge = {
@@ -263,43 +262,17 @@ describe("recovery bonus availability", () => {
 });
 
 describe("getChallengeProgress", () => {
-  function at(dateKey: string, hour = 8): string {
-    const [y, m, d] = dateKey.split("-").map(Number);
-    return new Date(y, m - 1, d, hour, 0, 0).toISOString();
-  }
-
-  function completions(entries: Array<[string, string[]]>): SessionCompletion[] {
-    return entries.flatMap(([date, routineIds]) =>
-      routineIds.map((routineId) => ({ routineId, completedAt: at(date) }))
-    );
-  }
-
   it("returns an empty progress when the challenge has not started", () => {
-    const progress = getChallengeProgress(
-      challenge,
-      DEFAULT_PLANK_STATE,
-      completions([[START, ["wake-up-workout"]]]),
-      onDay(0)
-    );
+    const progress = getChallengeProgress(challenge, DEFAULT_PLANK_STATE, onDay(0));
     expect(progress.started).toBe(false);
     expect(progress.days).toEqual([]);
-    expect(progress.combinedTotal).toBe(0);
+    expect(progress.plankTotal).toBe(0);
   });
 
-  it("combines plank and routine points per day with a running total", () => {
-    // Day 1: plank 2:00 (+1) + wake-up-workout (x2) + midday-decompress (+2 unique routines)
-    // Day 2 (today): no plank yet (pending, not a miss) + evening-unwind (+1)
+  it("tracks plank points per day with a running total", () => {
+    // Day 1: plank 2:00 (+1); Day 2 (today): no plank yet (pending, not a miss)
     const state = mkState(START, [[START, 120]]);
-    const progress = getChallengeProgress(
-      challenge,
-      state,
-      completions([
-        [START, ["wake-up-workout", "wake-up-workout", "midday-decompress"]],
-        [addDays(START, 1), ["evening-unwind"]],
-        [addDays(START, -1), ["wake-up-workout"]], // before the window: ignored
-      ]),
-      onDay(1)
-    );
+    const progress = getChallengeProgress(challenge, state, onDay(1));
 
     expect(progress.started).toBe(true);
     expect(progress.days).toHaveLength(30);
@@ -308,9 +281,7 @@ describe("getChallengeProgress", () => {
     expect(day1).toMatchObject({
       dayNumber: 1,
       plankPoints: 1,
-      routinePoints: 2,
-      totalPoints: 3,
-      runningTotal: 3,
+      runningTotal: 1,
       isToday: false,
       isFuture: false,
     });
@@ -319,28 +290,19 @@ describe("getChallengeProgress", () => {
     expect(day2).toMatchObject({
       dayNumber: 2,
       plankPoints: 0, // today: pending until the hold is done or the day passes
-      routinePoints: 1,
-      totalPoints: 1,
-      runningTotal: 4,
+      runningTotal: 1,
       isToday: true,
     });
 
     expect(progress.days[2].isFuture).toBe(true);
-    expect(progress.days[2].runningTotal).toBe(4);
+    expect(progress.days[2].runningTotal).toBe(1);
     expect(progress.plankTotal).toBe(1);
-    expect(progress.routineTotal).toBe(3);
-    expect(progress.combinedTotal).toBe(4);
   });
 
   it("marks a past day as missed (0 points) only after it has passed", () => {
     // Day 1 completed, day 2 missed; on day 3 the miss is settled
     const state = mkState(START, [[START, 120]]);
-    const progress = getChallengeProgress(
-      challenge,
-      state,
-      [],
-      onDay(2)
-    );
+    const progress = getChallengeProgress(challenge, state, onDay(2));
     expect(progress.days[1]).toMatchObject({
       plankPoints: 0,
       isMissed: true,
@@ -352,22 +314,6 @@ describe("getChallengeProgress", () => {
       isToday: true,
     });
     expect(progress.plankTotal).toBe(1);
-  });
-
-  it("ignores routine completions outside the challenge window", () => {
-    const state = mkState(START, []);
-    const lastDay = addDays(START, 29);
-    const progress = getChallengeProgress(
-      challenge,
-      state,
-      completions([
-        [addDays(START, -1), ["wake-up-workout"]],
-        [addDays(START, 30), ["wake-up-workout"]], // after the 30th day
-      ]),
-      new Date(2026, 0, 5)
-    );
-    expect(progress.routineTotal).toBe(0);
-    expect(progress.days.find((d) => d.date === lastDay)?.routinePoints).toBe(0);
   });
 });
 

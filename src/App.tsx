@@ -5,6 +5,7 @@ import { Finished } from "./pages/Finished";
 import { Settings } from "./pages/Settings";
 import { Challenge } from "./pages/Challenge";
 import { ChallengeProgress } from "./pages/ChallengeProgress";
+import { Progress } from "./pages/Progress";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useLocation } from "react-router-dom";
@@ -26,6 +27,7 @@ function App() {
             <Route path="/session" element={<Session />} />
             <Route path="/challenge" element={<Challenge />} />
             <Route path="/challenge/progress" element={<ChallengeProgress />} />
+            <Route path="/progress" element={<Progress />} />
             <Route path="/finished" element={<Finished />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

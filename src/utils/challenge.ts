@@ -7,7 +7,6 @@ import type {
   ChallengeProgress,
   ChallengeStatus,
   PlankChallengeState,
-  SessionCompletion,
 } from "../types/challenge";
 
 export const DEFAULT_PLANK_STATE: PlankChallengeState = {
@@ -19,7 +18,7 @@ export function todayKey(now: Date = new Date()): string {
   return toKey(now);
 }
 
-function toKey(d: Date): string {
+export function toKey(d: Date): string {
   const y = d.getFullYear();
   const m = `${d.getMonth() + 1}`.padStart(2, "0");
   const day = `${d.getDate()}`.padStart(2, "0");
@@ -206,23 +205,18 @@ export function getChallengeStatus(
 }
 
 /**
- * Combined day-by-day point history: the plank challenge keeps its own
- * scoring, routines earn their own +1 per unique routine per day, and the
- * running total merges both. Future days are included so charts can show
- * the full 30-day window.
+ * Day-by-day plank point history across the challenge window. Future
+ * days are included so charts can show the full 30-day window.
  */
 export function getChallengeProgress(
   challenge: Challenge,
   state: PlankChallengeState,
-  completions: SessionCompletion[],
   now: Date = new Date()
 ): ChallengeProgress {
   const empty: ChallengeProgress = {
     started: false,
     days: [],
     plankTotal: 0,
-    routineTotal: 0,
-    combinedTotal: 0,
   };
   if (!state.startedAt) {
     return empty;
@@ -236,23 +230,9 @@ export function getChallengeProgress(
     state.days.map((d) => [d.date, d.seconds])
   );
 
-  const routinesByDate = new Map<string, Set<string>>();
-  for (const completion of completions) {
-    try {
-      const date = toKey(new Date(completion.completedAt));
-      if (date < start || date > end) continue;
-      const ids = routinesByDate.get(date) ?? new Set<string>();
-      ids.add(completion.routineId);
-      routinesByDate.set(date, ids);
-    } catch {
-      // ignore malformed completion dates
-    }
-  }
-
   const days: ChallengeDayDetail[] = [];
   let runningTotal = 0;
   let plankTotal = 0;
-  let routineTotal = 0;
 
   let cursor = start;
   let dayNumber = 0;
@@ -269,15 +249,10 @@ export function getChallengeProgress(
     if (!isFuture && !isMissed) {
       plankPoints = holdSeconds > 0 ? pointsForHold(challenge, holdSeconds) : 0;
     }
-    const routinePoints = isFuture
-      ? 0
-      : (routinesByDate.get(cursor)?.size ?? 0);
-    const totalPoints = isFuture ? 0 : plankPoints + routinePoints;
 
     if (!isFuture) {
-      runningTotal += totalPoints;
+      runningTotal += plankPoints;
       plankTotal += plankPoints;
-      routineTotal += routinePoints;
     }
 
     days.push({
@@ -285,8 +260,6 @@ export function getChallengeProgress(
       dayNumber,
       plankPoints,
       isMissed,
-      routinePoints,
-      totalPoints,
       runningTotal,
       isToday,
       isFuture,
@@ -298,7 +271,5 @@ export function getChallengeProgress(
     started: true,
     days,
     plankTotal,
-    routineTotal,
-    combinedTotal: plankTotal + routineTotal,
   };
 }
