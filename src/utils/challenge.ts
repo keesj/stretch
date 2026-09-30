@@ -102,8 +102,53 @@ export function completePlankDay(
   return next;
 }
 
-/** Points for a hold: 0 below base, 1 at base, 1 + bonus at base + bonusSeconds. */
-export function pointsForHold(challenge: Challenge, seconds: number): number {
+/** True when the given day number is a milestone day (day 10, 20, ...). */
+export function isMilestoneDay(challenge: Challenge, dayNumber: number): boolean {
+  return (
+    challenge.milestoneEvery > 0 &&
+    dayNumber >= 1 &&
+    dayNumber <= challenge.totalDays &&
+    dayNumber % challenge.milestoneEvery === 0
+  );
+}
+
+/** Seconds required to complete the given day (milestone days are longer). */
+export function holdSecondsForDay(
+  challenge: Challenge,
+  dayNumber: number
+): number {
+  return isMilestoneDay(challenge, dayNumber)
+    ? challenge.milestoneSeconds
+    : challenge.baseSeconds;
+}
+
+/**
+ * 1-based day number for a date, or 0 when the challenge has no start
+ * date or the date falls outside the challenge window.
+ */
+export function dayNumberForDate(
+  challenge: Challenge,
+  state: PlankChallengeState,
+  date: string
+): number {
+  if (!state.startedAt) return 0;
+  const dayNumber = daysBetween(state.startedAt, date) + 1;
+  return dayNumber >= 1 && dayNumber <= challenge.totalDays ? dayNumber : 0;
+}
+
+/**
+ * Points for a hold on a given challenge day. Milestone days require the
+ * full milestone hold and pay the milestone points total; other days pay
+ * 1 at base, 1 + bonus at base + bonusSeconds.
+ */
+export function pointsForHold(
+  challenge: Challenge,
+  seconds: number,
+  dayNumber: number
+): number {
+  if (isMilestoneDay(challenge, dayNumber)) {
+    return seconds >= challenge.milestoneSeconds ? challenge.milestonePoints : 0;
+  }
   if (seconds >= challenge.baseSeconds + challenge.bonusSeconds) {
     return 1 + challenge.bonusPoints;
   }
@@ -133,6 +178,7 @@ export function getChallengeStatus(
       todayDone: false,
       todaySeconds: 0,
       todayPoints: 0,
+      todayIsMilestone: false,
       score: 0,
       baseline: 0,
       deficit: 0,
@@ -159,7 +205,8 @@ export function getChallengeStatus(
   let cursor = start;
   while (cursor <= lastFullDay) {
     pastDays += 1;
-    const points = pointsForHold(challenge, secondsByDate.get(cursor) ?? 0);
+    const cursorDay = daysBetween(start, cursor) + 1;
+    const points = pointsForHold(challenge, secondsByDate.get(cursor) ?? 0, cursorDay);
     if (points > 0) {
       pastScore += points;
       pastCompletedDays += 1;
@@ -172,18 +219,25 @@ export function getChallengeStatus(
 
   const todayInWindow = today >= start && today <= end;
   const todaySeconds = todayInWindow ? (secondsByDate.get(today) ?? 0) : 0;
-  const todayPoints = todayInWindow ? pointsForHold(challenge, todaySeconds) : 0;
   const dayNumber = Math.min(
     Math.max(daysBetween(start, today) + 1, 1),
     challenge.totalDays
   );
+  const todayIsMilestone = todayInWindow && isMilestoneDay(challenge, dayNumber);
+  const todayPoints = todayInWindow
+    ? pointsForHold(challenge, todaySeconds, dayNumber)
+    : 0;
 
   // The baseline is the number of fully elapsed days. The recovery hold is
   // only offered while behind the baseline (after at least one miss) and
-  // only up to MAX_RECOVERY_DEFICIT points behind.
+  // only up to MAX_RECOVERY_DEFICIT points behind. It is not offered on a
+  // milestone day, where it could not clear the longer hold.
   const deficit = Math.max(pastDays - pastScore, 0);
   const bonusAvailable =
-    missedDays > 0 && deficit > 0 && deficit <= MAX_RECOVERY_DEFICIT;
+    !todayIsMilestone &&
+    missedDays > 0 &&
+    deficit > 0 &&
+    deficit <= MAX_RECOVERY_DEFICIT;
 
   return {
     status: today > end ? "complete" : "active",
@@ -195,6 +249,7 @@ export function getChallengeStatus(
     todayDone: todayPoints > 0,
     todaySeconds,
     todayPoints,
+    todayIsMilestone,
     score: pastScore + todayPoints,
     baseline: pastDays,
     deficit,
@@ -243,11 +298,13 @@ export function getChallengeProgress(
     const holdSeconds = secondsByDate.get(cursor) ?? 0;
 
     let plankPoints = 0;
-    // A past day without a completed hold is a miss (0 points, no penalty).
-    // Today is not a miss until it has passed.
-    const isMissed = !isFuture && !isToday && holdSeconds < challenge.baseSeconds;
+    // A past day without the required hold is a miss (0 points, no
+    // penalty). Today is not a miss until it has passed.
+    const requiredSeconds = holdSecondsForDay(challenge, dayNumber);
+    const isMissed = !isFuture && !isToday && holdSeconds < requiredSeconds;
     if (!isFuture && !isMissed) {
-      plankPoints = holdSeconds > 0 ? pointsForHold(challenge, holdSeconds) : 0;
+      plankPoints =
+        holdSeconds > 0 ? pointsForHold(challenge, holdSeconds, dayNumber) : 0;
     }
 
     if (!isFuture) {

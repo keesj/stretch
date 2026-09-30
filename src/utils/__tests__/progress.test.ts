@@ -17,6 +17,9 @@ const challenge: Challenge = {
   baseSeconds: 120,
   bonusSeconds: 30,
   bonusPoints: 0.5,
+  milestoneEvery: 10,
+  milestoneSeconds: 180,
+  milestonePoints: 2,
   illustration: "💪",
 };
 
@@ -162,5 +165,51 @@ describe("getYearBuckets", () => {
     }
     const [ly, lm, ld] = bars[bars.length - 1].weekStart.split("-").map(Number);
     expect(new Date(ly, lm - 1, ld) < new Date(2027, 0, 1)).toBe(true);
+  });
+});
+
+describe("milestone days", () => {
+  it("scores a milestone day's 3-minute hold at 2 points", () => {
+    // Day 10 of a challenge started 2026-03-01
+    const state: PlankChallengeState = {
+      startedAt: "2026-03-01",
+      days: [
+        { date: "2026-03-10", seconds: 180 }, // day 10: +2
+        { date: "2026-03-11", seconds: 120 }, // day 11: +1
+      ],
+    };
+
+    expect(getDailyPoints(challenge, state, [], "2026-03-10")).toEqual({
+      plank: 2,
+      routine: 0,
+      total: 2,
+    });
+    expect(getDailyPoints(challenge, state, [], "2026-03-11")).toEqual({
+      plank: 1,
+      routine: 0,
+      total: 1,
+    });
+    expect(getOverallTotals(challenge, state, [])).toEqual({
+      plank: 3,
+      routine: 0,
+      total: 3,
+    });
+  });
+
+  it("scores a short hold on a milestone day at 0 points", () => {
+    const state: PlankChallengeState = {
+      startedAt: "2026-03-01",
+      days: [{ date: "2026-03-10", seconds: 120 }],
+    };
+    expect(getDailyPoints(challenge, state, [], "2026-03-10")).toEqual({
+      plank: 0,
+      routine: 0,
+      total: 0,
+    });
+    expect(getOverallTotals(challenge, state, [])).toEqual({
+      plank: 0,
+      routine: 0,
+      total: 0,
+    });
   });
 });

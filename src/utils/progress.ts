@@ -1,4 +1,4 @@
-import { pointsForHold, toKey, todayKey } from "./challenge";
+import { dayNumberForDate, pointsForHold, toKey, todayKey } from "./challenge";
 import type { CompletedSession } from "./storage";
 import type {
   Challenge,
@@ -36,7 +36,12 @@ export function getDailyPoints(
   sessions: CompletedSession[],
   date: string
 ): PointsBreakdown {
-  const plank = pointsForHold(challenge, secondsByDate(plankState).get(date) ?? 0);
+  const dayNumber = dayNumberForDate(challenge, plankState, date);
+  const plank = pointsForHold(
+    challenge,
+    secondsByDate(plankState).get(date) ?? 0,
+    dayNumber
+  );
   const routine = routineIdsByDate(sessions).get(date)?.size ?? 0;
   return { plank, routine, total: plank + routine };
 }
@@ -49,7 +54,11 @@ export function getOverallTotals(
 ): OverallTotals {
   let plank = 0;
   for (const day of plankState.days) {
-    plank += pointsForHold(challenge, day.seconds);
+    plank += pointsForHold(
+      challenge,
+      day.seconds,
+      dayNumberForDate(challenge, plankState, day.date)
+    );
   }
   let routine = 0;
   for (const ids of routineIdsByDate(sessions).values()) {
@@ -76,7 +85,11 @@ export function getMonthBuckets(
   for (let day = 1; day <= daysInMonth; day++) {
     const date = toKey(new Date(year, month, day));
     const points =
-      pointsForHold(challenge, plank.get(date) ?? 0) +
+      pointsForHold(
+        challenge,
+        plank.get(date) ?? 0,
+        dayNumberForDate(challenge, plankState, date)
+      ) +
       (routines.get(date)?.size ?? 0);
     bars.push({ date, dayOfMonth: day, points, isToday: date === today });
   }
@@ -102,7 +115,11 @@ export function getYearBuckets(
   const pointsOn = (date: Date) => {
     const key = toKey(date);
     return (
-      pointsForHold(challenge, plank.get(key) ?? 0) +
+      pointsForHold(
+        challenge,
+        plank.get(key) ?? 0,
+        dayNumberForDate(challenge, plankState, key)
+      ) +
       (routines.get(key)?.size ?? 0)
     );
   };

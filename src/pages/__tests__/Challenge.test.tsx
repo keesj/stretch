@@ -207,6 +207,49 @@ describe('Challenge page', () => {
     expect(plankCalls().at(-1)?.[1]).toContain('"seconds":150');
   }, 20000);
 
+  it('offers the 3:00 milestone hold on day 10 and records 2 points', async () => {
+    // Day 1 was 9 days ago; days 1-8 done, day 9 missed. The deficit
+    // would normally offer the recovery hold, but not on a milestone day.
+    const today = todayKey();
+    const day1 = addDays(today, -9);
+    const days = Array.from({ length: 8 }, (_, i) => ({
+      date: addDays(today, -(9 - i)),
+      seconds: 120,
+    }));
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({ startedAt: day1, days })
+    );
+
+    render(<ChallengeContainer />);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Day 10 of 30')).toBeInTheDocument();
+    const begin = await screen.findByText('Begin 3:00 Plank (+2 pts)');
+    expect(await screen.findByText(/Milestone day/)).toBeInTheDocument();
+    expect(screen.queryByText(/Hold 2:30/)).not.toBeInTheDocument();
+
+    await user.click(begin);
+
+    expect(await screen.findByText('Get ready…')).toBeInTheDocument();
+    expect(mockScheduleBeeps).toHaveBeenCalledTimes(1);
+    const beeps = mockScheduleBeeps.mock.calls[0][0];
+    // Ticks every 30s of the 180s hold, starting 3s into the hold
+    expect(beeps.slice(3).map((b) => b.at)).toEqual([33, 63, 93, 123, 153]);
+
+    await waitMs(3500);
+    expect(timerState.lastResetSeconds).toBe(180);
+    expect(timerState.startCalls).toBe(1);
+
+    act(() => {
+      timerState.onCompleteCb?.();
+    });
+
+    expect(await screen.findByText('Day 10 complete!')).toBeInTheDocument();
+    expect(screen.getByText('+2 pts today')).toBeInTheDocument();
+    expect(mockPlayHappyBeep).toHaveBeenCalledTimes(1);
+    expect(plankCalls().at(-1)?.[1]).toContain('"seconds":180');
+  }, 20000);
+
   it('shows the done screen without a chime when today was already completed', () => {
     const today = todayKey();
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(

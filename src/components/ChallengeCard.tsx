@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Card } from "./Card";
 import { Button } from "./Button";
+import { formatTime } from "../utils/timer";
 import type { Challenge, ChallengeStatus } from "../types/challenge";
 
 interface ChallengeCardProps {
@@ -93,6 +94,11 @@ export function ChallengeCard({
       {phase === "active" && missedDays > 0 && (
         <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
           Missed days: {missedDays}
+        </div>
+      )}
+      {phase === "active" && !todayDone && status.todayIsMilestone && (
+        <div className="text-xs font-medium text-primary-600 dark:text-primary-400 mb-3">
+          Milestone day: {formatTime(challenge.milestoneSeconds)} plank for {challenge.milestonePoints} pts
         </div>
       )}
       <div className="space-y-3">

@@ -13,6 +13,9 @@ const challenge: Challenge = {
   baseSeconds: 120,
   bonusSeconds: 30,
   bonusPoints: 0.5,
+  milestoneEvery: 10,
+  milestoneSeconds: 180,
+  milestonePoints: 2,
   illustration: '💪',
 };
 
@@ -24,6 +27,7 @@ function mkStatus(overrides: Partial<ChallengeStatus> = {}): ChallengeStatus {
     todayDone: false,
     todaySeconds: 0,
     todayPoints: 0,
+    todayIsMilestone: false,
     score: 4.5,
     baseline: 4,
     deficit: 1,
@@ -64,9 +68,24 @@ describe('ChallengeCard', () => {
     expect(screen.getByText('Day 5 of 30 • 26 left')).toBeInTheDocument();
     expect(screen.getByText('4.5 pts')).toBeInTheDocument();
     expect(screen.getByText('Missed days: 1')).toBeInTheDocument();
+    expect(screen.queryByText(/Milestone day/)).not.toBeInTheDocument();
 
     await userEvent.setup().click(screen.getByText('Start Day 5'));
     expect(onBegin).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the milestone hint on a milestone day that is not done yet', () => {
+    render(
+      <ChallengeCard
+        challenge={challenge}
+        status={mkStatus({ dayNumber: 10, daysLeft: 21, todayIsMilestone: true })}
+        onStart={vi.fn()}
+        onBegin={vi.fn()}
+        onRestart={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Milestone day: 3:00 plank for 2 pts')).toBeInTheDocument();
   });
 
   it('disables the button when today is already completed', () => {

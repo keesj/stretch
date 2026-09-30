@@ -144,6 +144,11 @@ export function Challenge() {
 
   const isHoldPhase = phase === "holding";
 
+  const beginSeconds = status.todayIsMilestone
+    ? challenge.milestoneSeconds
+    : challenge.baseSeconds;
+  const beginPoints = status.todayIsMilestone ? challenge.milestonePoints : 1;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-calm-50 via-calm-100 to-calm-200 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4 py-6 pb-12 max-w-md mx-auto flex flex-col">
       <div className="flex items-center justify-between mb-4">
@@ -197,6 +202,14 @@ export function Challenge() {
                   <span className="font-semibold text-primary-600 dark:text-primary-400">+1 pt</span>
                 </div>
                 <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                  <span className="text-gray-600 dark:text-gray-300">
+                    Every {challenge.milestoneEvery}th day: {formatTime(challenge.milestoneSeconds)} plank
+                  </span>
+                  <span className="font-semibold text-primary-600 dark:text-primary-400">
+                    {challenge.milestonePoints} pts
+                  </span>
+                </div>
+                <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
                   <span className="text-gray-600 dark:text-gray-300">Missed a day</span>
                   <span className="font-semibold text-gray-500 dark:text-gray-400">0 pts</span>
                 </div>
@@ -233,8 +246,8 @@ export function Challenge() {
                 ))}
               </div>
               <div className="w-full space-y-3">
-                <Button onClick={() => beginHold(challenge.baseSeconds)} className="w-full">
-                  Begin {formatTime(challenge.baseSeconds)} Plank (+1 pt)
+                <Button onClick={() => beginHold(beginSeconds)} className="w-full">
+                  Begin {formatTime(beginSeconds)} Plank (+{beginPoints} pt{beginPoints === 1 ? "" : "s"})
                 </Button>
                 {status.bonusAvailable && (
                   <Button
@@ -248,12 +261,16 @@ export function Challenge() {
                   </Button>
                 )}
               </div>
-              {status.bonusAvailable && (
+              {status.bonusAvailable ? (
                 <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 max-w-xs">
                   You&apos;re behind the pace — the extra hold counts as +
                   {challenge.bonusPoints} extra pts for today.
                 </p>
-              )}
+              ) : status.todayIsMilestone ? (
+                <p className="mt-4 text-xs text-primary-600 dark:text-primary-400 max-w-xs">
+                  Milestone day — hold the full {formatTime(challenge.milestoneSeconds)} and earn {challenge.milestonePoints} pts today.
+                </p>
+              ) : null}
             </div>
           )}
 

@@ -24,8 +24,14 @@ const challenge: Challenge = {
   baseSeconds: 120,
   bonusSeconds: 30,
   bonusPoints: 0.5,
+  milestoneEvery: 10,
+  milestoneSeconds: 180,
+  milestonePoints: 2,
   illustration: "💪",
 };
+
+/** Same challenge with milestones disabled, for plain-day scoring tests. */
+const plain: Challenge = { ...challenge, milestoneEvery: 0 };
 
 const START = "2026-01-05";
 
@@ -58,20 +64,45 @@ describe("date helpers", () => {
 
 describe("pointsForHold", () => {
   it("scores 0 below the base hold", () => {
-    expect(pointsForHold(challenge, 119)).toBe(0);
+    expect(pointsForHold(challenge, 119, 1)).toBe(0);
   });
 
   it("scores 1 at the base hold", () => {
-    expect(pointsForHold(challenge, 120)).toBe(1);
+    expect(pointsForHold(challenge, 120, 1)).toBe(1);
   });
 
   it("scores 1 for holds between base and bonus", () => {
-    expect(pointsForHold(challenge, 149)).toBe(1);
+    expect(pointsForHold(challenge, 149, 1)).toBe(1);
   });
 
   it("scores 1.5 at the bonus hold and caps it", () => {
-    expect(pointsForHold(challenge, 150)).toBe(1.5);
-    expect(pointsForHold(challenge, 300)).toBe(1.5);
+    expect(pointsForHold(challenge, 150, 1)).toBe(1.5);
+    expect(pointsForHold(challenge, 300, 1)).toBe(1.5);
+  });
+});
+
+describe("pointsForHold on milestone days", () => {
+  it("scores 0 below the milestone hold", () => {
+    expect(pointsForHold(challenge, 179, 10)).toBe(0);
+    expect(pointsForHold(challenge, 120, 10)).toBe(0);
+  });
+
+  it("scores the milestone points at the milestone hold and caps them", () => {
+    expect(pointsForHold(challenge, 180, 10)).toBe(2);
+    expect(pointsForHold(challenge, 180, 20)).toBe(2);
+    expect(pointsForHold(challenge, 180, 30)).toBe(2);
+    expect(pointsForHold(challenge, 300, 10)).toBe(2);
+  });
+
+  it("scores normally on the days before and after a milestone", () => {
+    expect(pointsForHold(challenge, 120, 9)).toBe(1);
+    expect(pointsForHold(challenge, 150, 9)).toBe(1.5);
+    expect(pointsForHold(challenge, 180, 11)).toBe(1.5);
+  });
+
+  it("does not apply the milestone outside the challenge window", () => {
+    expect(pointsForHold(challenge, 180, 0)).toBe(1.5);
+    expect(pointsForHold(challenge, 180, 31)).toBe(1.5);
   });
 });
 
@@ -110,6 +141,45 @@ describe("getChallengeStatus", () => {
     const status = getChallengeStatus(challenge, state, onDay(0));
     expect(status.todayPoints).toBe(1.5);
     expect(status.score).toBe(1.5);
+  });
+
+  it("scores a milestone day at 2 for the full hold", () => {
+    // Days 1-9 done at 2:00, day 10 (today) at 3:00
+    const entries: Array<[string, number]> = [];
+    for (let i = 0; i < 9; i++) entries.push([addDays(START, i), 120]);
+    entries.push([addDays(START, 9), 180]);
+    const status = getChallengeStatus(
+      challenge,
+      mkState(START, entries),
+      onDay(9)
+    );
+    expect(status.dayNumber).toBe(10);
+    expect(status.todayIsMilestone).toBe(true);
+    expect(status.todayDone).toBe(true);
+    expect(status.todayPoints).toBe(2);
+    expect(status.score).toBeCloseTo(11);
+  });
+
+  it("a short hold on a milestone day does not count as done", () => {
+    const state = mkState(START, [[addDays(START, 9), 120]]);
+    const status = getChallengeStatus(challenge, state, onDay(9));
+    expect(status.todayIsMilestone).toBe(true);
+    expect(status.todayPoints).toBe(0);
+    expect(status.todayDone).toBe(false);
+  });
+
+  it("does not offer the recovery hold on a milestone day", () => {
+    // Day 1 missed, days 2-9 done => deficit 1, but day 10 is a milestone
+    const entries: Array<[string, number]> = [];
+    for (let i = 1; i <= 8; i++) entries.push([addDays(START, i), 120]);
+    const status = getChallengeStatus(
+      challenge,
+      mkState(START, entries),
+      onDay(9)
+    );
+    expect(status.missedDays).toBe(1);
+    expect(status.deficit).toBe(1);
+    expect(status.bonusAvailable).toBe(false);
   });
 
   it("earns no points for a missed day once it has passed", () => {
@@ -159,9 +229,11 @@ describe("getChallengeStatus", () => {
   });
 
   it("completes after the 30th day has passed", () => {
+    // Milestone days (10, 20, 30) hold the full 3:00, the rest 2:00:
+    // 27 pts + 3 x 2 pts = 33
     const allDays = Array.from({ length: 30 }, (_, i) => [
       addDays(START, i),
-      120,
+      (i + 1) % 10 === 0 ? 180 : 120,
     ] as [string, number]);
     const state = mkState(START, allDays);
 
@@ -169,7 +241,8 @@ describe("getChallengeStatus", () => {
     expect(lastDay.status).toBe("active");
     expect(lastDay.dayNumber).toBe(30);
     expect(lastDay.daysLeft).toBe(0);
-    expect(lastDay.score).toBeCloseTo(30);
+    expect(lastDay.todayIsMilestone).toBe(true);
+    expect(lastDay.score).toBeCloseTo(33);
 
     const lastDayPending = getChallengeStatus(
       challenge,
@@ -180,7 +253,8 @@ describe("getChallengeStatus", () => {
 
     const after = getChallengeStatus(challenge, state, onDay(30));
     expect(after.status).toBe("complete");
-    expect(after.score).toBeCloseTo(30);
+    expect(after.todayIsMilestone).toBe(false);
+    expect(after.score).toBeCloseTo(33);
   });
 
   it("completes with a zero score when every day is missed", () => {
@@ -242,7 +316,7 @@ describe("recovery bonus availability", () => {
     const entries: Array<[string, number]> = [];
     for (let i = 0; i < 13; i++) entries.push([addDays(START, i), 120]);
     const state = mkState(START, entries);
-    const status = getChallengeStatus(challenge, state, onDay(15));
+    const status = getChallengeStatus(plain, state, onDay(15));
     expect(status.baseline).toBe(15);
     expect(status.score).toBeCloseTo(13);
     expect(status.deficit).toBeCloseTo(2);
@@ -254,7 +328,7 @@ describe("recovery bonus availability", () => {
     const entries: Array<[string, number]> = [];
     for (let i = 0; i < 12; i++) entries.push([addDays(START, i), 120]);
     const state = mkState(START, entries);
-    const status = getChallengeStatus(challenge, state, onDay(15));
+    const status = getChallengeStatus(plain, state, onDay(15));
     expect(status.score).toBeCloseTo(12);
     expect(status.deficit).toBeCloseTo(3);
     expect(status.bonusAvailable).toBe(false);
@@ -314,6 +388,38 @@ describe("getChallengeProgress", () => {
       isToday: true,
     });
     expect(progress.plankTotal).toBe(1);
+  });
+
+  it("scores milestone days at 2 points with a running total", () => {
+    // Day 9 at 2:00 (+1), day 10 at 3:00 (+2), day 11 at 2:00 (+1);
+    // today is day 12
+    const state = mkState(START, [
+      [addDays(START, 8), 120],
+      [addDays(START, 9), 180],
+      [addDays(START, 10), 120],
+    ]);
+    const progress = getChallengeProgress(challenge, state, onDay(11));
+
+    expect(progress.days[8]).toMatchObject({ dayNumber: 9, plankPoints: 1 });
+    expect(progress.days[9]).toMatchObject({
+      dayNumber: 10,
+      plankPoints: 2,
+      isMissed: false,
+      runningTotal: 3,
+    });
+    expect(progress.days[10]).toMatchObject({ dayNumber: 11, plankPoints: 1 });
+    expect(progress.plankTotal).toBe(4);
+  });
+
+  it("marks a past milestone day with a short hold as missed", () => {
+    // Day 10 held 2:00, below the 3:00 milestone; today is day 11
+    const state = mkState(START, [[addDays(START, 9), 120]]);
+    const progress = getChallengeProgress(challenge, state, onDay(10));
+    expect(progress.days[9]).toMatchObject({
+      dayNumber: 10,
+      plankPoints: 0,
+      isMissed: true,
+    });
   });
 });
 

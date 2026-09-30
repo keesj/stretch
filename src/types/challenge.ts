@@ -9,6 +9,15 @@ export interface Challenge {
   /** Extra seconds that earn the bonus points */
   bonusSeconds: number;
   bonusPoints: number;
+  /**
+   * Milestone cadence: every Nth day of the challenge (days 10, 20, ...
+   * when N is 10) requires the longer milestone hold. 0 disables it.
+   */
+  milestoneEvery: number;
+  /** Seconds required to complete a milestone day */
+  milestoneSeconds: number;
+  /** Total points a completed milestone day is worth */
+  milestonePoints: number;
   illustration: string;
 }
 
@@ -33,8 +42,10 @@ export interface ChallengeStatus {
   daysLeft: number;
   todayDone: boolean;
   todaySeconds: number;
-  /** Points earned today (0, 1, or 1 + bonus) */
+  /** Points earned today (0, 1, 1 + bonus, or milestone points) */
   todayPoints: number;
+  /** True when today is a milestone day (every milestoneEvery-th day) */
+  todayIsMilestone: boolean;
   /** Current plank score, including today's points */
   score: number;
   /** Fully elapsed days in the challenge window (the baseline) */
@@ -57,7 +68,7 @@ export const MAX_RECOVERY_DEFICIT = 2;
 export interface ChallengeDayDetail {
   date: string;
   dayNumber: number;
-  /** 1 | 1.5 | 0 (missed, pending today, or future) */
+  /** 1 | 1.5 | 2 (milestone day) | 0 (missed, pending today, or future) */
   plankPoints: number;
   /** A past day with no completed hold (misses earn 0, not negative) */
   isMissed: boolean;
