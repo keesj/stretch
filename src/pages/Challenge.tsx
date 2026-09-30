@@ -43,7 +43,9 @@ export function Challenge() {
   const [phase, setPhase] = useState<Phase>(() => {
     const initial = getChallengeStatus(challenge, loadPlankState());
     if (initial.status === "not-started") return "intro";
-    if (initial.todayDone) return "done";
+    // A completed challenge shows the done screen (with a restart option
+    // via the home card) instead of offering another hold for day 30.
+    if (initial.status === "complete" || initial.todayDone) return "done";
     return "ready";
   });
   const phaseRef = useRef<Phase>(phase);
@@ -369,9 +371,11 @@ export function Challenge() {
               <h1 className="text-3xl font-bold mb-2">
                 Day {status.dayNumber} complete!
               </h1>
-              <div className="text-primary-600 dark:text-primary-400 font-semibold mb-2">
-                +{status.todayPoints} pts today
-              </div>
+              {status.status !== "complete" && (
+                <div className="text-primary-600 dark:text-primary-400 font-semibold mb-2">
+                  +{status.todayPoints} pts today
+                </div>
+              )}
               <div className="text-gray-600 dark:text-gray-400 mb-2">
                 Total score: {status.score} pts
               </div>

@@ -250,6 +250,30 @@ describe('Challenge page', () => {
     expect(plankCalls().at(-1)?.[1]).toContain('"seconds":180');
   }, 20000);
 
+  it('shows the finished screen (no new hold) once the challenge is complete', () => {
+    // Day 30 was yesterday: every day is in the past, challenge complete
+    const today = todayKey();
+    const day1 = addDays(today, -30);
+    const days = Array.from({ length: 30 }, (_, i) => ({
+      date: addDays(day1, i),
+      seconds: (i + 1) % 10 === 0 ? 180 : 120,
+    }));
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({ startedAt: day1, days })
+    );
+
+    render(<ChallengeContainer />);
+
+    expect(screen.getByText('Day 30 of 30')).toBeInTheDocument();
+    expect(screen.getByText('Total score: 33 pts')).toBeInTheDocument();
+    expect(
+      screen.getByText('You finished the 30-day challenge. Amazing work!')
+    ).toBeInTheDocument();
+    // No "+0 pts today" line and no way to start another hold
+    expect(screen.queryByText(/pts today/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Begin .* Plank/)).not.toBeInTheDocument();
+  });
+
   it('shows the done screen without a chime when today was already completed', () => {
     const today = todayKey();
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(
