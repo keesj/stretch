@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Home } from '../Home';
+import routinesData from '../../data/routines.json';
 
 const navigateMockRef = vi.hoisted(() => ({ fn: vi.fn() }));
 
@@ -45,8 +46,10 @@ describe('Home Page', () => {
 
   it('renders a Start button for every routine and the challenge', () => {
     render(<MemoryRouter><Home /></MemoryRouter>);
-    // 1 challenge ("Start Day 1") + 5 routines ("Start")
-    expect(screen.getAllByRole('button', { name: /Start/i })).toHaveLength(6);
+    // 1 challenge ("Start Day 1") + one "Start" per routine
+    expect(screen.getAllByRole('button', { name: /Start/i })).toHaveLength(
+      (routinesData as { id: string }[]).length + 1
+    );
   });
 
   it('renders the plank challenge card', () => {
@@ -114,12 +117,13 @@ describe('Home Page', () => {
     render(<MemoryRouter><Home /></MemoryRouter>);
 
     // Last routine in the All Routines section
-    // (index 0 is the challenge button, 1 is featured, 2-5 are the rest)
-    fireEvent.click(screen.getAllByRole('button', { name: /Start/i })[5]);
+    // (index 0 is the challenge button, 1 is featured, 2+ are the rest)
+    const startButtons = screen.getAllByRole('button', { name: /Start/i });
+    fireEvent.click(startButtons[startButtons.length - 1]);
 
     expect(navigateMockRef.fn).toHaveBeenCalledWith('/session');
     expect(JSON.parse(activeSessionSaveCalls()[0][1])).toMatchObject({
-      routineId: 'flexibility-builder',
+      routineId: 'shin-calf-release',
     });
   });
 

@@ -66,4 +66,17 @@ describe('ExerciseCard', () => {
     render(<ExerciseCard exercise={longStretch} />);
     expect(screen.getByText('2 min')).toBeInTheDocument();
   });
+
+  it('renders seconds for sub-minute stretches', () => {
+    render(<ExerciseCard exercise={{ ...mockStretch, duration: 20 }} />);
+    expect(screen.getByText('20s')).toBeInTheDocument();
+  });
+
+  it('renders the animation instead of the illustration when one is defined', () => {
+    const { container } = render(
+      <ExerciseCard exercise={{ ...mockStretch, animation: 'ankle-circles', side: 'left' }} />
+    );
+    expect(container.querySelector('svg')).toBeInTheDocument();
+    expect(screen.queryByText('🧘')).not.toBeInTheDocument();
+  });
 });

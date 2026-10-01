@@ -41,7 +41,8 @@
     ],
     "bodyParts": ["back", "hips"],
     "difficulty": "easy",
-    "illustration": "🧘"
+    "illustration": "🧘",
+    "animation": "childs-pose"
   },
   {
     "id": "downward-dog",
@@ -56,7 +57,8 @@
     ],
     "bodyParts": ["spine", "hamstrings", "shoulders"],
     "difficulty": "medium",
-    "illustration": "🐕"
+    "illustration": "🐕",
+    "animation": "downward-dog"
   },
   {
     "id": "seated-forward-fold",
@@ -206,7 +208,8 @@
     ],
     "bodyParts": ["spine", "shoulders", "chest"],
     "difficulty": "easy",
-    "illustration": "🙆"
+    "illustration": "🙆",
+    "animation": "upward-salute"
   },
   {
     "id": "toe-touch",
@@ -221,7 +224,8 @@
     ],
     "bodyParts": ["hamstrings", "lower back"],
     "difficulty": "easy",
-    "illustration": "🧎"
+    "illustration": "🧎",
+    "animation": "toe-touch"
   },
   {
     "id": "lunge-left",
@@ -236,7 +240,9 @@
     ],
     "bodyParts": ["hips", "quads", "hamstrings"],
     "difficulty": "easy",
-    "illustration": "🦵"
+    "illustration": "🦵",
+    "animation": "lunge",
+    "side": "left"
   },
   {
     "id": "lunge-right",
@@ -251,7 +257,9 @@
     ],
     "bodyParts": ["hips", "quads", "hamstrings"],
     "difficulty": "easy",
-    "illustration": "🦵"
+    "illustration": "🦵",
+    "animation": "lunge",
+    "side": "right"
   },
   {
     "id": "upward-dog",
@@ -266,7 +274,8 @@
     ],
     "bodyParts": ["spine", "chest", "shoulders"],
     "difficulty": "medium",
-    "illustration": "🐕"
+    "illustration": "🐕",
+    "animation": "upward-dog"
   },
   {
     "id": "childs-pose",
@@ -281,7 +290,8 @@
     ],
     "bodyParts": ["back", "hips"],
     "difficulty": "easy",
-    "illustration": "🧘"
+    "illustration": "🧘",
+    "animation": "childs-pose"
   },
   {
     "id": "downward-dog-wake",
@@ -296,7 +306,8 @@
     ],
     "bodyParts": ["hamstrings", "shoulders", "spine"],
     "difficulty": "medium",
-    "illustration": "🐕"
+    "illustration": "🐕",
+    "animation": "downward-dog"
   },
   {
     "id": "wide-leg-bend",
@@ -311,6 +322,143 @@
     ],
     "bodyParts": ["hamstrings", "inner thighs", "lower back"],
     "difficulty": "easy",
-    "illustration": "🌟"
+    "illustration": "🌟",
+    "animation": "wide-leg-bend"
+  },
+  {
+    "id": "ankle-circles-left",
+    "title": "Ankle Circles (Left)",
+    "duration": 20,
+    "instructions": [
+      "Sit with your left leg extended",
+      "Lift your left foot slightly off the floor",
+      "Draw slow, large circles at the ankle",
+      "5 circles in one direction",
+      "5 circles in the other"
+    ],
+    "bodyParts": ["feet", "ankles"],
+    "difficulty": "easy",
+    "illustration": "👣",
+    "animation": "ankle-circles",
+    "side": "left"
+  },
+  {
+    "id": "ankle-circles-right",
+    "title": "Ankle Circles (Right)",
+    "duration": 20,
+    "instructions": [
+      "Sit with your right leg extended",
+      "Lift your right foot slightly off the floor",
+      "Draw slow, large circles at the ankle",
+      "5 circles in one direction",
+      "5 circles in the other"
+    ],
+    "bodyParts": ["feet", "ankles"],
+    "difficulty": "easy",
+    "illustration": "👣",
+    "animation": "ankle-circles",
+    "side": "right"
+  },
+  {
+    "id": "seated-shin-stretch-left",
+    "title": "Seated Shin Stretch (Left)",
+    "duration": 20,
+    "instructions": [
+      "Sit on the floor with both legs extended (a firm chair works too)",
+      "Bend your right knee and press its sole against your left inner thigh",
+      "Hold the toes of your straight left leg",
+      "Gently pull them toward your left shin",
+      "Hold and breathe deeply"
+    ],
+    "bodyParts": ["shins", "feet"],
+    "difficulty": "easy",
+    "illustration": "🦶",
+    "animation": "seated-shin",
+    "side": "left"
+  },
+  {
+    "id": "seated-shin-stretch-right",
+    "title": "Seated Shin Stretch (Right)",
+    "duration": 20,
+    "instructions": [
+      "Sit on the floor with both legs extended (a firm chair works too)",
+      "Bend your left knee and press its sole against your right inner thigh",
+      "Hold the toes of your straight right leg",
+      "Gently pull them toward your right shin",
+      "Hold and breathe deeply"
+    ],
+    "bodyParts": ["shins", "feet"],
+    "difficulty": "easy",
+    "illustration": "🦶",
+    "animation": "seated-shin",
+    "side": "right"
+  },
+  {
+    "id": "wall-calf-stretch-left",
+    "title": "Wall Calf Stretch (Left)",
+    "duration": 20,
+    "instructions": [
+      "Stand facing a wall with your hands on it",
+      "Step your left foot back, keeping the leg straight",
+      "Press your left heel into the floor",
+      "Lean in until your left calf lengthens",
+      "Hold and breathe"
+    ],
+    "bodyParts": ["calves", "shins"],
+    "difficulty": "easy",
+    "illustration": "🧱",
+    "animation": "wall-calf",
+    "side": "left"
+  },
+  {
+    "id": "wall-calf-stretch-right",
+    "title": "Wall Calf Stretch (Right)",
+    "duration": 20,
+    "instructions": [
+      "Stand facing a wall with your hands on it",
+      "Step your right foot back, keeping the leg straight",
+      "Press your right heel into the floor",
+      "Lean in until your right calf lengthens",
+      "Hold and breathe"
+    ],
+    "bodyParts": ["calves", "shins"],
+    "difficulty": "easy",
+    "illustration": "🧱",
+    "animation": "wall-calf",
+    "side": "right"
+  },
+  {
+    "id": "soleus-stretch-left",
+    "title": "Soleus Stretch (Left)",
+    "duration": 20,
+    "instructions": [
+      "Stand facing a wall with your hands on it",
+      "Step your left foot back with the heel on the floor",
+      "Bend both knees and sink your hips low",
+      "Keep your left heel pressed into the floor",
+      "Hold and breathe"
+    ],
+    "bodyParts": ["calves", "shins"],
+    "difficulty": "medium",
+    "illustration": "📐",
+    "animation": "soleus",
+    "side": "left"
+  },
+  {
+    "id": "soleus-stretch-right",
+    "title": "Soleus Stretch (Right)",
+    "duration": 20,
+    "instructions": [
+      "Stand facing a wall with your hands on it",
+      "Step your right foot back with the heel on the floor",
+      "Bend both knees and sink your hips low",
+      "Keep your right heel pressed into the floor",
+      "Hold and breathe"
+    ],
+    "bodyParts": ["calves", "shins"],
+    "difficulty": "medium",
+    "illustration": "📐",
+    "animation": "soleus",
+    "side": "right"
   }
 ]

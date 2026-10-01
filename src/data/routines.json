@@ -21,12 +21,18 @@
     "id": "evening-unwind",
     "title": "Evening Unwind",
     "description": "Relaxing stretches to release tension from your day",
-    "stretches": ["child-pose", "supine-spine-twist", "half-pigeon", "cobra-pose"]
+    "stretches": ["child-pose", "spine-twist", "half-pigeon", "cobra-pose"]
   },
   {
     "id": "flexibility-builder",
     "title": "Flexibility Builder",
     "description": "A more challenging routine to improve overall back flexibility",
     "stretches": ["downward-dog", "pyramid-pose", "cobra-pose", "seated-forward-fold", "half-pigeon"]
+  },
+  {
+    "id": "shin-calf-release",
+    "title": "Shin & Calf Release",
+    "description": "Release your shins and calves after a long day on your feet",
+    "stretches": ["ankle-circles-left", "ankle-circles-right", "seated-shin-stretch-left", "seated-shin-stretch-right", "wall-calf-stretch-left", "wall-calf-stretch-right", "downward-dog-wake", "soleus-stretch-left", "soleus-stretch-right", "childs-pose"]
   }
 ]

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ExerciseCard } from "../components/ExerciseCard";
+import { StretchAnimation } from "../components/StretchAnimation";
 import { Timer } from "../components/Timer";
 import { ProgressBar } from "../components/ProgressBar";
 import { Button } from "../components/Button";
@@ -109,19 +110,21 @@ export function Session() {
     prevCompletedRef.current = isCompleted;
   }, [isCompleted, playHappyBeep]);
 
-  const startCountdown = useCallback(() => {
+  const startCountdown = useCallback((seconds = 3) => {
     cancelCountdown();
 
     countdownCompleteRef.current = false;
-    setCountdownNumber(3);
+    setCountdownNumber(seconds);
 
-    // Schedule all beeps on the Web Audio clock so the 3-2-1 spacing is
+    // Schedule all beeps on the Web Audio clock so the countdown spacing is
     // sample-accurate instead of riding on setTimeout jitter.
     scheduleBeeps([
-      { frequency: 800, at: 0, duration: 0.1 },
-      { frequency: 800, at: 1, duration: 0.1 },
-      { frequency: 800, at: 2, duration: 0.1 },
-      { frequency: 1200, at: 3, duration: 0.3 },
+      ...Array.from({ length: seconds }, (_, i) => ({
+        frequency: 800,
+        at: i,
+        duration: 0.1,
+      })),
+      { frequency: 1200, at: seconds, duration: 0.3 },
     ]);
 
     // Derive the countdown from the clock every frame (same clock family
@@ -134,7 +137,7 @@ export function Session() {
 
     const tick = () => {
       const elapsed = elapsedAt();
-      if (elapsed >= 3) {
+      if (elapsed >= seconds) {
         countdownRafRef.current = null;
         setCountdownNumber(null);
         countdownCompleteRef.current = true;
@@ -144,7 +147,7 @@ export function Session() {
         }
         return;
       }
-      setCountdownNumber(Math.max(3 - Math.floor(elapsed), 1));
+      setCountdownNumber(Math.max(seconds - Math.floor(elapsed), 1));
       countdownRafRef.current = requestAnimationFrame(tick);
     };
     countdownRafRef.current = requestAnimationFrame(tick);
@@ -184,11 +187,13 @@ export function Session() {
     resetTimer(currentExercise.duration);
 
     // Only auto-start the next exercise when the previous one finished
-    // naturally (timer hit 0). Manual Next/Prev stays in "Ready".
+    // naturally (timer hit 0). Manual Next/Prev stays in "Ready". The
+    // transition countdown is longer than the initial 3-2-1 so there is
+    // time to move into the next position.
     const shouldAutoStart = autoAdvanceRef.current && currentExerciseIndex > 0 && !isCompleted;
     autoAdvanceRef.current = false;
     if (shouldAutoStart) {
-      startCountdown();
+      startCountdown(5);
     }
   }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, startCountdown, stopCountdown]);
 
@@ -295,31 +300,55 @@ export function Session() {
       )}
 
       <button
-        onClick={() => setShowInstructions(!showInstructions)}
+        onClick={() => setShowInstructions(true)}
         className="text-sm text-primary-600 dark:text-primary-400 hover:underline mb-3"
       >
-        {showInstructions ? "Hide Instructions" : "Show Instructions"}
+        Instructions
       </button>
 
       <AnimatePresence>
         {showInstructions && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+            onClick={() => setShowInstructions(false)}
           >
-            {currentExercise.instructions.map((instruction, index) => (
-              <motion.p
-                key={index}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: index * 0.1 }}
-                className="text-center text-gray-600 dark:text-gray-400 text-sm"
-              >
-                {index + 1}. {instruction}
-              </motion.p>
-            ))}
+            <motion.div
+              initial={{ scale: 0.95, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-sm max-h-[85vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex flex-col items-center text-center mb-4">
+                {currentExercise.animation ? (
+                  <div className="w-full max-w-[220px] mb-3">
+                    <StretchAnimation stretch={currentExercise} />
+                  </div>
+                ) : (
+                  <div className="text-6xl mb-3">{currentExercise.illustration}</div>
+                )}
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+                  {currentExercise.title}
+                </h2>
+              </div>
+              <ol className="space-y-2 mb-6">
+                {currentExercise.instructions.map((instruction, index) => (
+                  <li key={index} className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                    <span className="font-semibold text-primary-600 dark:text-primary-400">
+                      {index + 1}.
+                    </span>
+                    <span>{instruction}</span>
+                  </li>
+                ))}
+              </ol>
+              <Button onClick={() => setShowInstructions(false)} className="w-full">
+                Got it
+              </Button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

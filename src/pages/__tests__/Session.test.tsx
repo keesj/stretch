@@ -177,12 +177,18 @@ describe('Session exercise transition', () => {
     expect(screen.getByText('Previous')).toBeInTheDocument();
   });
 
-  it('toggles instructions visibility', async () => {
+  it('opens and closes the instructions overlay', async () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
 
     render(<SessionContainer />);
-    await userEvent.setup().click(screen.getByText('Show Instructions'));
-    expect(screen.getByText('Hide Instructions')).toBeInTheDocument();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByText('Instructions'));
+    expect(await screen.findByText('Got it')).toBeInTheDocument();
+    expect(screen.getByText('Raise arms')).toBeInTheDocument();
+
+    await user.click(screen.getByText('Got it'));
+    await waitFor(() => expect(screen.queryByText('Got it')).not.toBeInTheDocument());
   });
 
   it('renders Back button and navigates back', async () => {
@@ -298,7 +304,7 @@ describe('Session exercise transition', () => {
     expect(mockStart).not.toHaveBeenCalled();
   });
 
-  it('auto-starts the next exercise with a 3-2-1 countdown when the timer completes', async () => {
+  it('auto-starts the next exercise with a 5s transition countdown when the timer completes', async () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
     workoutState.totalExercises = 3;
 
@@ -314,15 +320,17 @@ describe('Session exercise transition', () => {
       { frequency: 800, at: 0, duration: 0.1 },
       { frequency: 800, at: 1, duration: 0.1 },
       { frequency: 800, at: 2, duration: 0.1 },
-      { frequency: 1200, at: 3, duration: 0.3 },
+      { frequency: 800, at: 3, duration: 0.1 },
+      { frequency: 800, at: 4, duration: 0.1 },
+      { frequency: 1200, at: 5, duration: 0.3 },
     ]);
 
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3100));
+      await new Promise(resolve => setTimeout(resolve, 5200));
     });
 
     expect(mockStart).toHaveBeenCalled();
-  });
+  }, 20000);
 
   it('plays the happy beep when the workout completes', async () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
@@ -373,14 +381,14 @@ describe('Session exercise transition', () => {
     expect(finishNavigate).toHaveBeenCalledWith('/finished', { state: { session: sessionData } });
   });
 
-  it('shows exercise instructions when toggled', async () => {
+  it('shows exercise instructions in the overlay', async () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
 
     render(<SessionContainer />);
-    await userEvent.setup().click(screen.getByText('Show Instructions'));
+    await userEvent.setup().click(screen.getByText('Instructions'));
 
-    expect(screen.getByText(/1\./)).toBeInTheDocument();
-    expect(screen.getByText(/2\./)).toBeInTheDocument();
+    expect(await screen.findByText('Raise arms')).toBeInTheDocument();
+    expect(screen.getByText('Hold')).toBeInTheDocument();
   });
 
   it('shows the correct exercise from wake-up-workout', () => {
