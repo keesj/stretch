@@ -32,9 +32,6 @@ export function Session() {
   const countdownCompleteRef = useRef(false);
   const autoAdvanceRef = useRef(false);
   const prevCompletedRef = useRef(false);
-  // True once the current exercise's countdown finished and the timer ran
-  // (so "Paused" is shown instead of "Ready" when the user hits Pause).
-  const hasStartedRef = useRef(false);
   // 3-2-1 shown while the start countdown runs (null otherwise)
   const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
 
@@ -100,6 +97,10 @@ export function Session() {
     },
   });
 
+  // True once the current exercise's timer has run (so "Paused" is shown
+  // instead of "Ready" when the user pauses partway through).
+  const isStarted = isRunning || timeLeft < currentExercise.duration;
+
   const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
   useWakeLock({ isActive: isRunning && !isPaused || countdownNumber != null });
 
@@ -141,7 +142,6 @@ export function Session() {
         countdownRafRef.current = null;
         setCountdownNumber(null);
         countdownCompleteRef.current = true;
-        hasStartedRef.current = true;
         if (!isCompleted) {
           start();
         }
@@ -173,17 +173,20 @@ export function Session() {
     }
   }, [stopCountdown, previousExercise, currentExerciseIndex]);
 
-  const handleStartPause = useCallback(() => {
+  const handleTimerClick = useCallback(() => {
+    if (countdownNumber != null) {
+      stopCountdown();
+      return;
+    }
     if (isRunning) {
       pause();
     } else {
       startCountdown();
     }
-  }, [isRunning, pause, startCountdown]);
+  }, [countdownNumber, stopCountdown, isRunning, pause, startCountdown]);
 
   useEffect(() => {
     stopCountdown();
-    hasStartedRef.current = false;
     resetTimer(currentExercise.duration);
 
     // Only auto-start the next exercise when the previous one finished
@@ -258,24 +261,48 @@ export function Session() {
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.3 }}
         >
-          <ExerciseCard exercise={currentExercise} />
+          <ExerciseCard
+            exercise={currentExercise}
+            aside={
+              <motion.button
+                type="button"
+                onClick={handleTimerClick}
+                aria-label={
+                  countdownNumber != null
+                    ? "Cancel countdown"
+                    : isRunning
+                      ? "Pause"
+                      : isStarted
+                        ? "Resume"
+                        : "Start"
+                }
+                animate={
+                  countdownNumber == null && !isRunning && !isStarted
+                    ? { scale: [1, 1.03, 1] }
+                    : { scale: 1 }
+                }
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                whileTap={{ scale: 0.96 }}
+                className="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <Timer
+                  displayTime={countdownNumber ?? timeLeft}
+                  isRunning={isRunning}
+                  isCounting={countdownNumber != null}
+                  isPaused={
+                    isPaused ||
+                    (isStarted && !isRunning && timeLeft > 0)
+                  }
+                  totalDuration={currentExercise.duration}
+                  breathing
+                  label={showTransitionMessage ? "Almost Done" : undefined}
+                  size={200}
+                />
+              </motion.button>
+            }
+          />
         </motion.div>
       </AnimatePresence>
-
-      <div className="my-8">
-        <Timer
-          displayTime={countdownNumber ?? timeLeft}
-          isRunning={isRunning}
-          isCounting={countdownNumber != null}
-          isPaused={
-            isPaused ||
-            (hasStartedRef.current && !isRunning && timeLeft > 0)
-          }
-          totalDuration={currentExercise.duration}
-          countdownDisplay={showNextPreview ? timeLeft : null}
-          isTransitionMessage={showTransitionMessage}
-        />
-      </div>
 
       {showNextPreview && currentExerciseIndex < totalExercises - 1 && (
         <motion.div
@@ -361,14 +388,6 @@ export function Session() {
           className="flex-1"
         >
           Previous
-        </Button>
-
-        <Button
-          variant="secondary"
-          onClick={handleStartPause}
-          className="flex-1"
-        >
-          {isRunning ? "Pause" : "Start"}
         </Button>
 
         <Button onClick={goToNext} className="flex-1">

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "../components/Button";
+import { Timer } from "../components/Timer";
 import { useTimer } from "../hooks/useTimer";
 import { useBeep } from "../hooks/useBeep";
 import { useWakeLock } from "../hooks/useWakeLock";
@@ -20,9 +21,6 @@ import challengesData from "../data/challenges.json";
 import stretchesData from "../data/stretches.json";
 
 type Phase = "intro" | "ready" | "countdown" | "holding" | "done";
-
-const RING_RADIUS = 120;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 export function Challenge() {
   const navigate = useNavigate();
@@ -53,7 +51,6 @@ export function Challenge() {
 
   const [countNumber, setCountNumber] = useState(3);
   const countdownRafRef = useRef<number | null>(null);
-  const [breathingIn, setBreathingIn] = useState(true);
   const [holdSeconds, setHoldSeconds] = useState(challenge.baseSeconds);
 
   const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
@@ -81,14 +78,6 @@ export function Challenge() {
   useWakeLock({ isActive: isRunning || phase === "countdown" });
 
   useEffect(() => cancelCountdown, [cancelCountdown]);
-
-  // Breathing cue: 4s in / 4s out while actively holding
-  useEffect(() => {
-    if (phase !== "holding" || !isRunning) return;
-    setBreathingIn(true);
-    const id = setInterval(() => setBreathingIn((b) => !b), 4000);
-    return () => clearInterval(id);
-  }, [phase, isRunning]);
 
   const beginHold = useCallback(
     (seconds: number) => {
@@ -142,7 +131,6 @@ export function Challenge() {
   }, [cancelCountdown, navigate]);
 
   const total = holdSeconds;
-  const progress = total > 0 ? Math.min(Math.max((total - timeLeft) / total, 0), 1) : 0;
 
   const isHoldPhase = phase === "holding";
 
@@ -295,52 +283,14 @@ export function Challenge() {
 
           {isHoldPhase && (
             <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="relative w-72 h-72">
-                <svg viewBox="0 0 280 280" className="w-full h-full">
-                  <circle
-                    cx="140"
-                    cy="140"
-                    r={RING_RADIUS}
-                    fill="none"
-                    strokeWidth="10"
-                    className="stroke-calm-300 dark:stroke-gray-700"
-                  />
-                  <circle
-                    cx="140"
-                    cy="140"
-                    r={RING_RADIUS}
-                    fill="none"
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeDasharray={RING_CIRCUMFERENCE}
-                    strokeDashoffset={RING_CIRCUMFERENCE * (1 - progress)}
-                    transform="rotate(-90 140 140)"
-                    className="stroke-primary-500 dark:stroke-primary-400"
-                    style={{ transition: "stroke-dashoffset 1s linear" }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <motion.div
-                    animate={
-                      isRunning
-                        ? { scale: breathingIn ? 1.25 : 1, opacity: breathingIn ? 0.5 : 0.25 }
-                        : { scale: 1, opacity: 0.25 }
-                    }
-                    transition={{ duration: 4, ease: "easeInOut" }}
-                    className="absolute w-44 h-44 rounded-full bg-primary-300 dark:bg-primary-700"
-                  />
-                  <div className="relative text-6xl font-light text-gray-800 dark:text-gray-100">
-                    {formatTime(timeLeft)}
-                  </div>
-                  <div className="relative mt-2 text-sm font-medium text-primary-600 dark:text-primary-400">
-                    {!isRunning
-                      ? "Paused"
-                      : breathingIn
-                        ? "Breathe in"
-                        : "Breathe out"}
-                  </div>
-                </div>
-              </div>
+              <Timer
+                displayTime={timeLeft}
+                totalDuration={total}
+                isRunning={isRunning}
+                isPaused={!isRunning}
+                displayText={formatTime(timeLeft)}
+                breathing
+              />
 
               <div className="mt-10 w-full flex gap-3">
                 {isRunning ? (

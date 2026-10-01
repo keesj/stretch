@@ -36,57 +36,50 @@ describe('Timer', () => {
     expect(screen.getByText('Paused')).toBeInTheDocument();
   });
 
-  it('shows "Almost Done" for transition message', () => {
+  it('shows the label override instead of the status label', () => {
     render(
       <Timer
         displayTime={5}
         isRunning={true}
         isPaused={false}
-        countdownDisplay={5}
-        isTransitionMessage={true}
+        label="Almost Done"
       />
     );
     expect(screen.getByText('Almost Done')).toBeInTheDocument();
+    expect(screen.queryByText('Running')).not.toBeInTheDocument();
   });
 
-  it('shows countdownDisplay when in transition mode', () => {
+  it('shows the displayText override in the center', () => {
     render(
-      <Timer
-        displayTime={60}
-        isRunning={true}
-        isPaused={false}
-        countdownDisplay={8}
-        isTransitionMessage={true}
-      />
+      <Timer displayTime={150} isRunning={false} isPaused={false} displayText="2:30" />
     );
-    expect(screen.getByText('8')).toBeInTheDocument();
+    expect(screen.getByText('2:30')).toBeInTheDocument();
+    expect(screen.queryByText('150')).not.toBeInTheDocument();
   });
 
-  it('does not show countdownDisplay when not in transition mode', () => {
-    render(
-      <Timer
-        displayTime={60}
-        isRunning={true}
-        isPaused={false}
-        countdownDisplay={8}
-      />
-    );
-    expect(screen.getByText('60')).toBeInTheDocument();
-    expect(screen.queryByText('8')).not.toBeInTheDocument();
+  it('shows "Breathe in" while running with breathing enabled', () => {
+    render(<Timer displayTime={60} isRunning={true} isPaused={false} breathing />);
+    expect(screen.getByText('Breathe in')).toBeInTheDocument();
   });
 
-  it('shows the 3-2-1 countdown with "Get ready…" while counting', () => {
+  it('does not show breathing cues when breathing is disabled', () => {
+    render(<Timer displayTime={60} isRunning={true} isPaused={false} />);
+    expect(screen.queryByText('Breathe in')).not.toBeInTheDocument();
+  });
+
+  it('shows the 3-2-1 countdown inside the ring with "Get ready…"', () => {
     const { container } = render(<Timer displayTime={3} isRunning={false} isPaused={false} isCounting />);
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('Get ready…')).toBeInTheDocument();
-    // Progress bar is hidden during the countdown
-    expect(container.querySelector('.h-1')).not.toBeInTheDocument();
+    // The ring stays on screen (empty) so the layout does not jump
+    const ring = container.querySelector('circle[stroke-dashoffset]');
+    expect(ring).toBeInTheDocument();
+    expect(ring!.getAttribute('stroke-dashoffset')).toBe(ring!.getAttribute('stroke-dasharray'));
   });
 
-  it('renders progress bar', () => {
+  it('renders the ring when not counting', () => {
     const { container } = render(<Timer displayTime={60} isRunning={false} isPaused={false} />);
-    const progressBar = container.querySelector('.h-1');
-    expect(progressBar).toBeInTheDocument();
+    expect(container.querySelectorAll('svg circle')).toHaveLength(2);
   });
 
   it('renders with custom total duration', () => {

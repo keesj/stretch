@@ -168,13 +168,16 @@ describe('Session exercise transition', () => {
     expect(screen.getByText(/Upward Salute/i)).toBeInTheDocument();
   });
 
-  it('renders Start, Previous, and Next buttons', () => {
+  it('renders Previous, Next, and the clickable timer', () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
 
     render(<SessionContainer />);
-    expect(screen.getByText('Start')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
     expect(screen.getByText('Next')).toBeInTheDocument();
     expect(screen.getByText('Previous')).toBeInTheDocument();
+    // No visible Start/Pause button anymore — the timer is the control
+    expect(screen.queryByText('Start')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pause')).not.toBeInTheDocument();
   });
 
   it('opens and closes the instructions overlay', async () => {
@@ -210,11 +213,11 @@ describe('Session exercise transition', () => {
     expect(screen.getByText('Previous')).toBeDisabled();
   });
 
-  it('Start button starts countdown', async () => {
+  it('clicking the timer starts the countdown', async () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
 
     render(<SessionContainer />);
-    await userEvent.setup().click(screen.getByText('Start'));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Start' }));
 
     // Start button → startCountdown() → playBeep (mocked) → setTimeout → playFinalBeep → start()
     // Since playBeep and playFinalBeep are mocked, setTimeout still fires after 3000ms in node
@@ -231,7 +234,7 @@ describe('Session exercise transition', () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
 
     render(<SessionContainer />);
-    await userEvent.setup().click(screen.getByText('Start'));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Start' }));
 
     expect(screen.getByText('Get ready…')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
@@ -253,7 +256,7 @@ describe('Session exercise transition', () => {
     timerState.isRunning = true;
     render(<SessionContainer />);
 
-    await userEvent.setup().click(screen.getByText('Pause'));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Pause' }));
     expect(mockPause).toHaveBeenCalled();
   });
 
