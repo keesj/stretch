@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pose Capture Tool</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 20px; background: #f5f5f4; color: #292524; }
+      h1 { font-size: 20px; }
+      .row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+      video, canvas, img { max-width: 480px; width: 480px; background: #000; border-radius: 8px; }
+      .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+      button { padding: 8px 16px; border-radius: 8px; border: 1px solid #a8a29e; background: #fff; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.primary { background: #6d28d9; color: #fff; border: none; }
+      input[type="text"] { padding: 6px 8px; border-radius: 6px; border: 1px solid #a8a29e; }
+      pre { background: #1c1917; color: #d6d3d1; padding: 12px; border-radius: 8px; max-width: 1000px; overflow: auto; font-size: 12px; }
+      .status { font-size: 13px; color: #78716c; }
+      .help { font-size: 13px; color: #57534e; max-width: 720px; }
+      .help li { margin: 4px 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Pose Capture Tool</h1>
+    <ul class="help">
+      <li><b>1)</b> Pick a video (or photo) of ONE exercise — full body in frame, camera on a tripod, <b>hold the pose for a few seconds</b>.</li>
+      <li><b>2)</b> Type the animation id (e.g. <code>downward-dog</code>) and click <b>Capture</b>. It samples frames, detects the skeleton, and averages the joints.</li>
+      <li><b>3)</b> Check the skeleton overlay on the right, then <b>Download JSON</b> and save it as <code>src/data/poses/&lt;id&gt;.json</code>.</li>
+      <li><b>4)</b> Repeat per exercise, then run <code>node scripts/pose-to-figures.mjs</code>.</li>
+    </ul>
+    <div class="controls">
+      <input type="file" id="file" accept="video/*,image/*" />
+      <input type="text" id="name" placeholder="animation id, e.g. downward-dog" style="width: 260px" />
+      <button id="capture" class="primary" disabled>Capture</button>
+      <button id="download" disabled>Download JSON</button>
+      <span id="status" class="status"></span>
+    </div>
+    <div class="row">
+      <div id="sourceWrap">
+        <video id="video" playsinline muted style="display: none"></video>
+        <img id="photo" alt="" style="display: none" />
+      </div>
+      <canvas id="canvas" width="480" height="480"></canvas>
+    </div>
+    <pre id="out"></pre>
+    <script type="module">
+      import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
+
+      const WASM_LOCAL = `${location.origin}/node_modules/@mediapipe/tasks-vision/wasm`;
+      const WASM_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
+      const MODEL_URL =
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task";
+
+      async function makeLandmarker(mode) {
+        const fileset =
+          (await FilesetResolver.forVisionTasks(WASM_LOCAL).catch(() => null)) ??
+          (await FilesetResolver.forVisionTasks(WASM_CDN));
+        const options = {
+          baseOptions: { modelAssetPath: MODEL_URL, delegate: "GPU" },
+          runningMode: mode,
+          numPoses: 1,
+        };
+        try {
+          return await PoseLandmarker.createFromOptions(fileset, options);
+        } catch {
+          options.baseOptions = { modelAssetPath: MODEL_URL, delegate: "CPU" };
+          return await PoseLandmarker.createFromOptions(fileset, options);
+        }
+      }
+
+      const KEYPARTS = [
+        "nose", "left_eye_inner", "left_eye", "left_eye_outer", "right_eye_inner",
+        "right_eye", "right_eye_outer", "left_ear", "right_ear", "mouth_left",
+        "mouth_right", "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+        "left_wrist", "right_wrist", "left_pinky", "right_pinky", "left_index",
+        "right_index", "left_thumb", "right_thumb", "left_hip", "right_hip",
+        "left_knee", "right_knee", "left_ankle", "right_ankle", "left_heel",
+        "right_heel", "left_foot_index", "right_foot_index",
+      ];
+
+      const video = document.getElementById("video");
+      const photo = document.getElementById("photo");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const fileInput = document.getElementById("file");
+      const nameInput = document.getElementById("name");
+      const captureBtn = document.getElementById("capture");
+      const downloadBtn = document.getElementById("download");
+      const statusEl = document.getElementById("status");
+      const outEl = document.getElementById("out");
+
+      let videoLandmarker = null;
+      let imageLandmarker = null;
+      let result = null;
+      let source = null; // element detection runs on / drawn to canvas
+      let isVideo = false;
+
+      statusEl.textContent = "Pick a video — the pose model (~12 MB) downloads on first capture.";
+
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        isVideo = file.type.startsWith("video");
+        if (isVideo) {
+          video.src = url;
+          video.style.display = "block";
+          photo.style.display = "none";
+          source = video;
+        } else {
+          photo.src = url;
+          photo.style.display = "block";
+          video.style.display = "none";
+          source = photo;
+        }
+        captureBtn.disabled = false;
+      });
+
+      captureBtn.addEventListener("click", async () => {
+        captureBtn.disabled = true;
+        try {
+          const frames = [];
+          if (isVideo) {
+            statusEl.textContent = "Loading pose model (first capture downloads ~12 MB)…";
+            if (!videoLandmarker) videoLandmarker = await makeLandmarker("VIDEO");
+            video.muted = true;
+            await video.play();
+            await new Promise((r) => setTimeout(r, 600));
+            video.pause();
+            const duration = video.duration;
+            const n = 15;
+            for (let i = 0; i < n; i++) {
+              const t = duration * (0.2 + (0.6 * i) / (n - 1));
+              video.currentTime = t;
+              await new Promise((r) => video.addEventListener("seeked", r, { once: true }));
+              const res = videoLandmarker.detectForVideo(video, performance.now());
+              if (res.landmarks.length > 0) frames.push(res.landmarks[0]);
+            }
+          } else {
+            statusEl.textContent = "Loading pose model (first capture downloads ~12 MB)…";
+            if (!imageLandmarker) imageLandmarker = await makeLandmarker("IMAGE");
+            const res = imageLandmarker.detect(photo);
+            if (res.landmarks.length > 0) frames.push(res.landmarks[0]);
+          }
+
+          if (frames.length === 0) {
+            statusEl.textContent = "No person detected — try a brighter, full-body, unobstructed clip.";
+            captureBtn.disabled = false;
+            return;
+          }
+
+          const avg = frames[0].map((_, i) => {
+            let x = 0;
+            let y = 0;
+            let w = 0;
+            for (const f of frames) {
+              const k = f[i];
+              const vis = k.visibility ?? 1;
+              if (vis > 0.5) {
+                x += k.x * vis;
+                y += k.y * vis;
+                w += vis;
+              }
+            }
+            return {
+              name: KEYPARTS[i],
+              x: w > 0 ? x / w : null,
+              y: w > 0 ? y / w : null,
+              visibility: w / frames.length,
+            };
+          });
+
+          result = {
+            exercise: nameInput.value.trim() || "unnamed",
+            framesUsed: frames.length,
+            width: isVideo ? video.videoWidth : photo.naturalWidth,
+            height: isVideo ? video.videoHeight : photo.naturalHeight,
+            keypoints: avg,
+          };
+
+          drawOverlay(frames[0]);
+          outEl.textContent = JSON.stringify(result, null, 2);
+          statusEl.textContent = `Averaged ${frames.length} frame(s). Check the skeleton, then Download JSON.`;
+          downloadBtn.disabled = false;
+        } catch (e) {
+          statusEl.textContent = "Error: " + e.message;
+        }
+        captureBtn.disabled = false;
+      });
+
+      function drawOverlay(landmarks) {
+        const w = isVideo ? video.videoWidth : photo.naturalWidth;
+        const h = isVideo ? video.videoHeight : photo.naturalHeight;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(source, 0, 0, w, h);
+        const pts = landmarks.map((k) => ({ x: k.x * w, y: k.y * h, vis: k.visibility ?? 1 }));
+        const links = [
+          [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
+          [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [27, 29], [27, 31],
+          [24, 26], [26, 28], [28, 30], [28, 32], [0, 11], [0, 12],
+        ];
+        ctx.lineWidth = Math.max(3, w / 160);
+        for (const [a, b] of links) {
+          if (pts[a].vis < 0.5 || pts[b].vis < 0.5) continue;
+          ctx.strokeStyle = "#22d3ee";
+          ctx.beginPath();
+          ctx.moveTo(pts[a].x, pts[a].y);
+          ctx.lineTo(pts[b].x, pts[b].y);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#f472b6";
+        for (const pt of pts) {
+          if (pt.vis < 0.5) continue;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, Math.max(4, w / 140), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      downloadBtn.addEventListener("click", () => {
+        if (!result) return;
+        const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${result.exercise}.json`;
+        a.click();
+      });
+    </script>
+  </body>
+</html>
