@@ -208,7 +208,31 @@ describe("getChallengeStatus", () => {
     expect(status.deficit).toBe(3);
   });
 
-  it("a missed day is fully recoverable with two bonus days", () => {
+  it("a missed day is fully cleared by a single bonus hold", () => {
+    // Day 1 done (+1), day 2 missed (0), day 3 at 2:30 (+1.5)
+    const state = mkState(START, [
+      [START, 120],
+      [addDays(START, 2), 150],
+    ]);
+
+    // On day 3, once the 2:30 hold is done, today's points count toward the
+    // deficit: the 1.5 earned covers the 1.0 missed, so the user is on pace.
+    const onDay3 = getChallengeStatus(challenge, state, onDay(2));
+    expect(onDay3.todayDone).toBe(true);
+    expect(onDay3.score).toBeCloseTo(2.5);
+    expect(onDay3.baseline).toBe(2);
+    expect(onDay3.deficit).toBe(0);
+    expect(onDay3.bonusAvailable).toBe(false);
+
+    // On day 4 before its hold, the baseline has grown by one, so a
+    // transient 0.5 is owed until day 4's hold is completed.
+    const onDay4 = getChallengeStatus(challenge, state, onDay(3));
+    expect(onDay4.todayDone).toBe(false);
+    expect(onDay4.deficit).toBeCloseTo(0.5);
+    expect(onDay4.bonusAvailable).toBe(true);
+  });
+
+  it("two consecutive bonus days leave the user ahead of the baseline", () => {
     // Day 1 done (+1), day 2 missed (0), days 3-4 at 2:30 (+1.5 each)
     const state = mkState(START, [
       [START, 120],
@@ -216,16 +240,12 @@ describe("getChallengeStatus", () => {
       [addDays(START, 3), 150],
     ]);
 
-    const afterFirstBonus = getChallengeStatus(challenge, state, onDay(3));
-    expect(afterFirstBonus.deficit).toBeCloseTo(0.5);
-    expect(afterFirstBonus.bonusAvailable).toBe(true);
-
-    const afterSecondBonus = getChallengeStatus(challenge, state, onDay(4));
-    expect(afterSecondBonus.completedDays).toBe(3);
-    expect(afterSecondBonus.missedDays).toBe(1);
-    expect(afterSecondBonus.score).toBeCloseTo(4);
-    expect(afterSecondBonus.deficit).toBe(0);
-    expect(afterSecondBonus.bonusAvailable).toBe(false);
+    const onDay5 = getChallengeStatus(challenge, state, onDay(4));
+    expect(onDay5.completedDays).toBe(3);
+    expect(onDay5.missedDays).toBe(1);
+    expect(onDay5.score).toBeCloseTo(4);
+    expect(onDay5.deficit).toBe(0);
+    expect(onDay5.bonusAvailable).toBe(false);
   });
 
   it("completes after the 30th day has passed", () => {

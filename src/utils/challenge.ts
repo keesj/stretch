@@ -228,11 +228,13 @@ export function getChallengeStatus(
     ? pointsForHold(challenge, todaySeconds, dayNumber)
     : 0;
 
-  // The baseline is the number of fully elapsed days. The recovery hold is
-  // only offered while behind the baseline (after at least one miss) and
-  // only up to MAX_RECOVERY_DEFICIT points behind. It is not offered on a
-  // milestone day, where it could not clear the longer hold.
-  const deficit = Math.max(pastDays - pastScore, 0);
+  // The baseline is the number of fully elapsed days. Today's points count
+  // toward clearing the deficit, so once the recovery hold is done the user
+  // is no longer "behind". The recovery hold itself is only offered while
+  // behind the baseline (after at least one miss) and only up to
+  // MAX_RECOVERY_DEFICIT points behind. It is not offered on a milestone
+  // day, where it could not clear the longer hold.
+  const deficit = Math.max(pastDays - pastScore - todayPoints, 0);
   const bonusAvailable =
     !todayIsMilestone &&
     missedDays > 0 &&
