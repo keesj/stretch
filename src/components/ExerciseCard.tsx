@@ -29,26 +29,14 @@ export function ExerciseCard({ exercise, aside }: ExerciseCardProps) {
 
   return (
     <div className="flex flex-col items-center text-center">
-      {aside ? (
-        <div className="mb-4 flex w-full items-center justify-center gap-2">
-          <div className="w-40 shrink-0">
-            <ExerciseVisual exercise={exercise} />
-          </div>
-          <div className="shrink-0">{aside}</div>
-        </div>
-      ) : (
-        <div className="mb-4 w-full max-w-[240px]">
-          <ExerciseVisual exercise={exercise} />
-        </div>
-      )}
-      <h2 className="mb-2 text-2xl font-semibold">{exercise.title}</h2>
-      <div className={`mb-3 text-sm font-medium ${difficultyColors[exercise.difficulty]}`}>
+      <h2 className="mb-1 text-2xl font-semibold">{exercise.title}</h2>
+      <div className={`mb-1 text-sm font-medium ${difficultyColors[exercise.difficulty]}`}>
         {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
       </div>
       <div className="mb-3 text-sm text-gray-500 dark:text-gray-400">
         {formatDuration(exercise.duration)}
       </div>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="mb-4 flex flex-wrap justify-center gap-2">
         {exercise.bodyParts.map((part) => (
           <span
             key={part}
@@ -58,6 +46,18 @@ export function ExerciseCard({ exercise, aside }: ExerciseCardProps) {
           </span>
         ))}
       </div>
+      {aside ? (
+        <div className="flex w-full items-center justify-center gap-2">
+          <div className="w-40 shrink-0">
+            <ExerciseVisual exercise={exercise} />
+          </div>
+          <div className="shrink-0">{aside}</div>
+        </div>
+      ) : (
+        <div className="w-full max-w-[240px]">
+          <ExerciseVisual exercise={exercise} />
+        </div>
+      )}
     </div>
   );
 }
