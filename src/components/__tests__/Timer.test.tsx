@@ -57,29 +57,75 @@ describe('Timer', () => {
     expect(screen.queryByText('150')).not.toBeInTheDocument();
   });
 
-  it('shows "Breathe in" while running with breathing enabled', () => {
-    render(<Timer displayTime={60} isRunning={true} isPaused={false} breathing />);
-    expect(screen.getByText('Breathe in')).toBeInTheDocument();
-  });
-
-  it('does not show breathing cues when breathing is disabled', () => {
-    render(<Timer displayTime={60} isRunning={true} isPaused={false} />);
+  it('shows the breathing pulse circle while running with breathing enabled', () => {
+    const { container } = render(<Timer displayTime={60} isRunning={true} isPaused={false} breathing />);
+    expect(container.querySelector('.bg-primary-300')).toBeInTheDocument();
     expect(screen.queryByText('Breathe in')).not.toBeInTheDocument();
   });
 
-  it('shows the 3-2-1 countdown inside the ring with "Get ready…"', () => {
-    const { container } = render(<Timer displayTime={3} isRunning={false} isPaused={false} isCounting />);
-    expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByText('Get ready…')).toBeInTheDocument();
-    // The ring stays on screen (empty) so the layout does not jump
-    const ring = container.querySelector('circle[stroke-dashoffset]');
-    expect(ring).toBeInTheDocument();
-    expect(ring!.getAttribute('stroke-dashoffset')).toBe(ring!.getAttribute('stroke-dasharray'));
+  it('does not render the pulse circle when breathing is disabled', () => {
+    const { container } = render(<Timer displayTime={60} isRunning={true} isPaused={false} />);
+    expect(container.querySelector('.bg-primary-300')).not.toBeInTheDocument();
   });
 
-  it('renders the ring when not counting', () => {
+  it('shows the main time with a +N suffix for the lead-in', () => {
+    render(
+      <Timer
+        displayTime={62}
+        isRunning={false}
+        isPaused={false}
+        totalDuration={63}
+        countdownSeconds={3}
+        countdownRemaining={2}
+      />
+    );
+    expect(screen.getByText('60')).toBeInTheDocument();
+    expect(screen.getByText('+ 2')).toBeInTheDocument();
+  });
+
+  it('shows the countdown inside the ring with "Get ready…" while counting', () => {
+    const { container } = render(
+      <Timer
+        displayTime={33}
+        isRunning={false}
+        isPaused={false}
+        isCounting
+        totalDuration={33}
+        countdownSeconds={3}
+        countdownRemaining={3}
+      />
+    );
+    expect(screen.getByText('30')).toBeInTheDocument();
+    expect(screen.getByText('+ 3')).toBeInTheDocument();
+    expect(screen.getByText('Get ready…')).toBeInTheDocument();
+    // The ring stays on screen (empty) so the layout does not jump
+    expect(container.querySelector('svg')).toBeInTheDocument();
+    expect(container.querySelector('circle.stroke-primary-500')).not.toBeInTheDocument();
+  });
+
+  it('shows a play icon when not running so the timer looks tappable', () => {
     const { container } = render(<Timer displayTime={60} isRunning={false} isPaused={false} />);
-    expect(container.querySelectorAll('svg circle')).toHaveLength(2);
+    expect(container.querySelector('svg[viewBox="0 0 24 24"]')).toBeInTheDocument();
+  });
+
+  it('hides the play icon while running', () => {
+    const { container } = render(<Timer displayTime={60} isRunning={true} isPaused={false} />);
+    expect(container.querySelector('svg[viewBox="0 0 24 24"]')).not.toBeInTheDocument();
+  });
+
+  it('hides the play icon while counting', () => {
+    const { container } = render(
+      <Timer
+        displayTime={33}
+        isRunning={false}
+        isPaused={false}
+        isCounting
+        totalDuration={33}
+        countdownSeconds={3}
+        countdownRemaining={3}
+      />
+    );
+    expect(container.querySelector('svg[viewBox="0 0 24 24"]')).not.toBeInTheDocument();
   });
 
   it('renders with custom total duration', () => {

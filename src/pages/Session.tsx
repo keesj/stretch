@@ -34,6 +34,9 @@ export function Session() {
   const prevCompletedRef = useRef(false);
   // 3-2-1 shown while the start countdown runs (null otherwise)
   const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
+  // Length of the lead-in countdown (3s to start, 5s between exercises),
+  // included in the displayed total and marked on the ring
+  const [countdownSeconds, setCountdownSeconds] = useState(3);
 
   const cancelCountdown = useCallback(() => {
     if (countdownRafRef.current != null) {
@@ -100,6 +103,16 @@ export function Session() {
   // True once the current exercise's timer has run (so "Paused" is shown
   // instead of "Ready" when the user pauses partway through).
   const isStarted = isRunning || timeLeft < currentExercise.duration;
+  // Lead-in seconds still to go (shown as "60 + 3" and on the ring)
+  const countdownRemaining = countdownNumber != null
+    ? countdownNumber
+    : !isStarted && !isPaused
+      ? countdownSeconds
+      : null;
+  const displayTime =
+    countdownRemaining != null
+      ? currentExercise.duration + countdownRemaining
+      : timeLeft;
 
   const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
   useWakeLock({ isActive: isRunning && !isPaused || countdownNumber != null });
@@ -116,6 +129,7 @@ export function Session() {
 
     countdownCompleteRef.current = false;
     setCountdownNumber(seconds);
+    setCountdownSeconds(seconds);
 
     // Schedule all beeps on the Web Audio clock so the countdown spacing is
     // sample-accurate instead of riding on setTimeout jitter.
@@ -180,13 +194,17 @@ export function Session() {
     }
     if (isRunning) {
       pause();
+    } else if (isStarted) {
+      // Resume from a pause — straight back to the paused time, no countdown
+      start();
     } else {
       startCountdown();
     }
-  }, [countdownNumber, stopCountdown, isRunning, pause, startCountdown]);
+  }, [countdownNumber, stopCountdown, isRunning, isStarted, pause, start, startCountdown]);
 
   useEffect(() => {
     stopCountdown();
+    setCountdownSeconds(3);
     resetTimer(currentExercise.duration);
 
     // Only auto-start the next exercise when the previous one finished
@@ -286,14 +304,16 @@ export function Session() {
                 className="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 <Timer
-                  displayTime={countdownNumber ?? timeLeft}
+                  displayTime={displayTime}
                   isRunning={isRunning}
                   isCounting={countdownNumber != null}
                   isPaused={
                     isPaused ||
                     (isStarted && !isRunning && timeLeft > 0)
                   }
-                  totalDuration={currentExercise.duration}
+                  totalDuration={currentExercise.duration + countdownSeconds}
+                  countdownSeconds={countdownSeconds}
+                  countdownRemaining={countdownRemaining}
                   breathing
                   label={showTransitionMessage ? "Almost Done" : undefined}
                   size={200}

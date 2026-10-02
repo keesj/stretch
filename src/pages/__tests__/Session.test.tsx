@@ -36,8 +36,14 @@ const timerState = {
   isPaused: false,
   onCompleteCb: null as null | (() => void),
 };
-const mockStart = vi.fn();
-const mockPause = vi.fn();
+// Stable identities (like the real hook's useCallbacks) — a fresh start/pause
+// per render would re-run the exercise-change effect and cancel the countdown.
+const mockStart = vi.fn(() => {
+  timerState.isRunning = true;
+});
+const mockPause = vi.fn(() => {
+  timerState.isRunning = false;
+});
 const mockSkip = vi.fn();
 const mockReset = vi.fn();
 
@@ -146,8 +152,9 @@ describe('Session exercise transition', () => {
     timerState.isRunning = false;
     timerState.isPaused = false;
     timerState.onCompleteCb = null;
-    mockStart.mockReset();
-    mockPause.mockReset();
+    // mockClear (not mockReset) to keep the isRunning implementations
+    mockStart.mockClear();
+    mockPause.mockClear();
     mockSkip.mockReset();
     mockScheduleBeeps.mockReset();
     mockPlayHappyBeep.mockReset();
@@ -237,7 +244,9 @@ describe('Session exercise transition', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Start' }));
 
     expect(screen.getByText('Get ready…')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    // The lead-in is shown explicitly: 60s stretch + 3s countdown
+    expect(screen.getByText('60')).toBeInTheDocument();
+    expect(screen.getByText('+ 3')).toBeInTheDocument();
 
     // rAF-driven countdown: ~3s outside act so state updates land normally
     await waitMs(3200);
@@ -246,9 +255,27 @@ describe('Session exercise transition', () => {
     await waitFor(() =>
       expect(screen.queryByText('Get ready…')).not.toBeInTheDocument()
     );
-    // Back to the exercise timer
+    // Back to the plain exercise timer, no lead-in suffix
     expect(screen.getByText('60')).toBeInTheDocument();
+    expect(screen.queryByText('+ 3')).not.toBeInTheDocument();
   }, 20000);
+
+  it('resumes from the paused time without a countdown', async () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
+    // Paused partway through the exercise (21s of a 60s stretch left)
+    timerState.isRunning = false;
+    timerState.timeLeft = 21;
+
+    render(<SessionContainer />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Resume' }));
+    expect(mockStart).toHaveBeenCalled();
+    // No 3-2-1 on resume (a countdown would re-render with "Get ready…")
+    expect(screen.queryByText('Get ready…')).not.toBeInTheDocument();
+    expect(screen.queryByText('+ 3')).not.toBeInTheDocument();
+    expect(screen.getByText('21')).toBeInTheDocument();
+  });
 
   it('toggle to Pause when running', async () => {
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));

@@ -147,7 +147,7 @@ describe('Challenge page', () => {
     expect(timerState.lastResetSeconds).toBe(120);
     expect(timerState.startCalls).toBe(1);
     expect(await screen.findByText('2:00')).toBeInTheDocument();
-    expect(await screen.findByText('Breathe in')).toBeInTheDocument();
+    expect(await screen.findByText('Running')).toBeInTheDocument();
   }, 20000);
 
   it('completing the hold records the day and shows the done screen', async () => {
