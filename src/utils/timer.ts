@@ -4,6 +4,10 @@ export function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+export function formatDuration(seconds: number): string {
+  return seconds >= 60 ? `${Math.floor(seconds / 60)} min` : `${seconds}s`;
+}
+
 export function parseTime(timeString: string): number {
   const parts = timeString.split(":").map(Number);
   if (parts.length === 2) {

@@ -24,52 +24,12 @@ describe('ExerciseCard', () => {
     expect(screen.getByText('Neck Stretch')).toBeInTheDocument();
   });
 
-  it('renders difficulty with correct color class', () => {
+  it('keeps the workout view clean: no duration, difficulty or body parts', () => {
     render(<ExerciseCard exercise={mockStretch} />);
-    expect(screen.getByText('Easy')).toBeInTheDocument();
-  });
-
-  it('renders duration in minutes', () => {
-    render(<ExerciseCard exercise={mockStretch} />);
-    expect(screen.getByText('1 min')).toBeInTheDocument();
-  });
-
-  it('renders body parts as badges', () => {
-    render(<ExerciseCard exercise={mockStretch} />);
-    expect(screen.getByText('neck')).toBeInTheDocument();
-    expect(screen.getByText('shoulders')).toBeInTheDocument();
-  });
-
-  it('renders medium difficulty', () => {
-    const mediumStretch: Stretch = {
-      ...mockStretch,
-      difficulty: 'medium',
-    };
-    render(<ExerciseCard exercise={mediumStretch} />);
-    expect(screen.getByText('Medium')).toBeInTheDocument();
-  });
-
-  it('renders hard difficulty', () => {
-    const hardStretch: Stretch = {
-      ...mockStretch,
-      difficulty: 'hard',
-    };
-    render(<ExerciseCard exercise={hardStretch} />);
-    expect(screen.getByText('Hard')).toBeInTheDocument();
-  });
-
-  it('handles multi-minute duration', () => {
-    const longStretch: Stretch = {
-      ...mockStretch,
-      duration: 150,
-    };
-    render(<ExerciseCard exercise={longStretch} />);
-    expect(screen.getByText('2 min')).toBeInTheDocument();
-  });
-
-  it('renders seconds for sub-minute stretches', () => {
-    render(<ExerciseCard exercise={{ ...mockStretch, duration: 20 }} />);
-    expect(screen.getByText('20s')).toBeInTheDocument();
+    expect(screen.queryByText('1 min')).not.toBeInTheDocument();
+    expect(screen.queryByText('Easy')).not.toBeInTheDocument();
+    expect(screen.queryByText('neck')).not.toBeInTheDocument();
+    expect(screen.queryByText('shoulders')).not.toBeInTheDocument();
   });
 
   it('renders the animation instead of the illustration when one is defined', () => {

@@ -3,10 +3,14 @@ import type { Stretch } from "../types/stretch";
 
 interface StretchAnimationProps {
   stretch: Stretch;
+  /** Animate the figure (false = hold a still pose) */
+  playing?: boolean;
 }
 
 const FIGURE = "stroke-primary-500 dark:stroke-primary-400";
 const SCENE = "stroke-calm-300 dark:stroke-gray-600";
+
+const PAUSE_TRANSITION = { duration: 0.4, ease: "easeOut" as const };
 
 function SideBadge({ side }: { side?: "left" | "right" }) {
   if (!side) return null;
@@ -24,15 +28,15 @@ function SideBadge({ side }: { side?: "left" | "right" }) {
 }
 
 /** Pulsing highlight on the muscle being stretched */
-function Pulse({ cx, cy, r = 9 }: { cx: number; cy: number; r?: number }) {
+function Pulse({ cx, cy, r = 9, playing }: { cx: number; cy: number; r?: number; playing: boolean }) {
   return (
     <motion.circle
       cx={cx}
       cy={cy}
       r={r}
       className="fill-primary-400 dark:fill-primary-500"
-      animate={{ opacity: [0.15, 0.45, 0.15] }}
-      transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+      animate={playing ? { opacity: [0.15, 0.45, 0.15] } : { opacity: 0.15 }}
+      transition={playing ? { repeat: Infinity, duration: 2, ease: "easeInOut" } : PAUSE_TRANSITION}
     />
   );
 }
@@ -48,14 +52,14 @@ function Head({ cx, cy }: { cx: number; cy: number }) {
 }
 
 /** Top-down foot with a dot orbiting the ankle in circles */
-function AnkleCircles() {
+function AnkleCircles({ playing }: { playing: boolean }) {
   return (
     <>
       <circle cx={100} cy={74} r={46} fill="none" strokeWidth={2} strokeDasharray="6 8" className={SCENE} />
       <motion.g
         style={{ originX: 0.5, originY: 0.5 }}
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+        animate={playing ? { rotate: 360 } : { rotate: 0 }}
+        transition={playing ? { repeat: Infinity, duration: 4, ease: "linear" } : PAUSE_TRANSITION}
       >
         <circle cx={100} cy={74} r={46} fill="transparent" />
         <circle cx={100} cy={28} r={7} className="fill-primary-500 dark:fill-primary-400" />
@@ -69,7 +73,7 @@ function AnkleCircles() {
 }
 
 /** Seated on the floor, one leg straight with toes pulled up, other knee up, hands holding the toes */
-function SeatedShin() {
+function SeatedShin({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
@@ -80,19 +84,19 @@ function SeatedShin() {
       <Limb x1={62} y1={114} x2={90} y2={84} />
       <Limb x1={90} y1={84} x2={74} y2={118} />
       <Limb x1={74} y1={118} x2={86} y2={122} />
-      <motion.g animate={{ x: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { x: [0, 5, 0] } : { x: 0 }} transition={playing ? { repeat: Infinity, duration: 2.5, ease: "easeInOut" } : PAUSE_TRANSITION}>
         <Limb x1={62} y1={114} x2={74} y2={62} />
         <Head cx={84} cy={48} />
         <Limb x1={72} y1={64} x2={134} y2={112} />
         <Limb x1={68} y1={70} x2={128} y2={118} />
       </motion.g>
-      <Pulse cx={94} cy={116} />
+      <Pulse cx={94} cy={116} playing={playing} />
     </>
   );
 }
 
 /** Hands on the wall, back leg straight with heel down, front knee bent */
-function WallCalf() {
+function WallCalf({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
@@ -106,26 +110,26 @@ function WallCalf() {
       <Limb x1={92} y1={92} x2={116} y2={108} />
       <Limb x1={116} y1={108} x2={120} y2={124} />
       <Limb x1={120} y1={124} x2={132} y2={124} />
-      <motion.g animate={{ x: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { x: [0, 5, 0] } : { x: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         <Limb x1={92} y1={92} x2={128} y2={48} />
         <Head cx={138} cy={40} />
         <Limb x1={128} y1={48} x2={174} y2={58} />
         <Limb x1={124} y1={54} x2={174} y2={68} />
       </motion.g>
-      <Pulse cx={74} cy={106} />
+      <Pulse cx={74} cy={106} playing={playing} />
     </>
   );
 }
 
 /** Hands on the wall, both knees bent pointing down, hips sunk low, back heel on the floor */
-function Soleus() {
+function Soleus({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
       <line x1={182} y1={18} x2={182} y2={126} strokeWidth={4} className={SCENE} />
       <line x1={184} y1={44} x2={192} y2={52} strokeWidth={3} className={SCENE} />
       <line x1={184} y1={84} x2={192} y2={92} strokeWidth={3} className={SCENE} />
-      <motion.g animate={{ y: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, 4, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         {/* back leg bent: thigh down-back to the knee, shin down to the heel on the floor */}
         <Limb x1={96} y1={100} x2={66} y2={110} />
         <Limb x1={66} y1={110} x2={56} y2={124} />
@@ -139,13 +143,13 @@ function Soleus() {
         <Limb x1={110} y1={48} x2={174} y2={58} />
         <Limb x1={106} y1={54} x2={174} y2={68} />
       </motion.g>
-      <Pulse cx={61} cy={117} />
+      <Pulse cx={61} cy={117} playing={playing} />
     </>
   );
 }
 
 /** Standing, reaching the arms overhead */
-function UpwardSalute() {
+function UpwardSalute({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
@@ -153,7 +157,7 @@ function UpwardSalute() {
       <Limb x1={100} y1={92} x2={112} y2={124} />
       <Limb x1={100} y1={49} x2={100} y2={92} />
       <Head cx={100} cy={38} />
-      <motion.g animate={{ y: [0, -12, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, -12, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         <Limb x1={100} y1={55} x2={78} y2={22} />
         <Limb x1={100} y1={55} x2={122} y2={22} />
       </motion.g>
@@ -162,7 +166,7 @@ function UpwardSalute() {
 }
 
 /** Standing, hinging at the hips with the torso folding down toward the feet */
-function ToeTouch() {
+function ToeTouch({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
@@ -171,20 +175,20 @@ function ToeTouch() {
       <Limb x1={90} y1={122} x2={101} y2={124} />
       <Limb x1={96} y1={88} x2={104} y2={122} />
       <Limb x1={104} y1={122} x2={115} y2={124} />
-      <motion.g animate={{ y: [0, 6, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, 6, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         {/* torso folded down toward the feet, head hanging */}
         <Limb x1={96} y1={88} x2={122} y2={104} />
         <Head cx={132} cy={112} />
         <Limb x1={122} y1={104} x2={126} y2={124} />
         <Limb x1={118} y1={106} x2={122} y2={124} />
       </motion.g>
-      <Pulse cx={98} cy={106} />
+      <Pulse cx={98} cy={106} playing={playing} />
     </>
   );
 }
 
 /** Lunging, back knee on the floor, holding the back foot */
-function Lunge() {
+function Lunge({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
@@ -198,37 +202,37 @@ function Lunge() {
       <Limb x1={120} y1={124} x2={132} y2={124} />
       <Limb x1={88} y1={78} x2={84} y2={42} />
       <Head cx={83} cy={29} />
-      <motion.g animate={{ y: [0, 3, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, 3, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         <Limb x1={84} y1={44} x2={80} y2={112} />
         <Limb x1={80} y1={48} x2={86} y2={116} />
       </motion.g>
-      <Pulse cx={80} cy={90} />
+      <Pulse cx={80} cy={90} playing={playing} />
     </>
   );
 }
 
 /** Prone, arms pushing the chest off the floor */
-function UpwardDog() {
+function UpwardDog({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
       {/* legs stay on the floor */}
       <Limb x1={75} y1={112} x2={40} y2={110} />
       <Limb x1={40} y1={110} x2={30} y2={118} />
-      <motion.g animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, -3, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         <Limb x1={75} y1={112} x2={118} y2={72} />
         <Limb x1={118} y1={72} x2={146} y2={60} />
         <Head cx={152} cy={56} />
         <Limb x1={114} y1={76} x2={136} y2={122} />
         <Limb x1={108} y1={80} x2={128} y2={124} />
       </motion.g>
-      <Pulse cx={112} cy={84} />
+      <Pulse cx={112} cy={84} playing={playing} />
     </>
   );
 }
 
 /** Kneeling, hips down by the heels, folded forward over the arms */
-function ChildsPose() {
+function ChildsPose({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
@@ -236,88 +240,88 @@ function ChildsPose() {
       <Limb x1={108} y1={112} x2={100} y2={122} />
       <Limb x1={100} y1={122} x2={125} y2={124} />
       <Limb x1={125} y1={124} x2={132} y2={106} />
-      <motion.g animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, -3, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         <Limb x1={108} y1={112} x2={64} y2={116} />
         <Head cx={54} cy={118} />
         <Limb x1={64} y1={116} x2={30} y2={122} />
         <Limb x1={62} y1={119} x2={32} y2={125} />
       </motion.g>
-      <Pulse cx={90} cy={112} />
+      <Pulse cx={90} cy={112} playing={playing} />
     </>
   );
 }
 
 /** Inverted V: hands and toes down, hips pressed up */
-function DownwardDog() {
+function DownwardDog({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
-      <motion.g animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, -4, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         <Limb x1={148} y1={124} x2={138} y2={84} />
         <Limb x1={138} y1={84} x2={88} y2={46} />
         <Limb x1={88} y1={46} x2={45} y2={118} />
         <Limb x1={45} y1={118} x2={36} y2={124} />
         <Head cx={130} cy={76} />
       </motion.g>
-      <Pulse cx={66} cy={84} />
+      <Pulse cx={66} cy={84} playing={playing} />
     </>
   );
 }
 
 /** Wide stance, folding forward between the legs */
-function WideLegBend() {
+function WideLegBend({ playing }: { playing: boolean }) {
   return (
     <>
       <line x1={14} y1={126} x2={186} y2={126} strokeWidth={3} className={SCENE} />
       <Limb x1={52} y1={124} x2={88} y2={90} />
       <Limb x1={148} y1={124} x2={112} y2={90} />
-      <motion.g animate={{ y: [0, 8, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+      <motion.g animate={playing ? { y: [0, 8, 0] } : { y: 0 }} transition={playing ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : PAUSE_TRANSITION}>
         {/* torso folded down between the legs, arms reaching between them */}
         <Limb x1={100} y1={90} x2={100} y2={60} />
         <Head cx={100} cy={48} />
         <Limb x1={100} y1={62} x2={92} y2={88} />
         <Limb x1={100} y1={62} x2={108} y2={88} />
       </motion.g>
-      <Pulse cx={100} cy={74} />
+      <Pulse cx={100} cy={74} playing={playing} />
     </>
   );
 }
 
-export function StretchAnimation({ stretch }: StretchAnimationProps) {
+export function StretchAnimation({ stretch, playing = true }: StretchAnimationProps) {
   let figure = null;
   switch (stretch.animation) {
     case "ankle-circles":
-      figure = <AnkleCircles />;
+      figure = <AnkleCircles playing={playing} />;
       break;
     case "seated-shin":
-      figure = <SeatedShin />;
+      figure = <SeatedShin playing={playing} />;
       break;
     case "wall-calf":
-      figure = <WallCalf />;
+      figure = <WallCalf playing={playing} />;
       break;
     case "soleus":
-      figure = <Soleus />;
+      figure = <Soleus playing={playing} />;
       break;
     case "upward-salute":
-      figure = <UpwardSalute />;
+      figure = <UpwardSalute playing={playing} />;
       break;
     case "toe-touch":
-      figure = <ToeTouch />;
+      figure = <ToeTouch playing={playing} />;
       break;
     case "lunge":
-      figure = <Lunge />;
+      figure = <Lunge playing={playing} />;
       break;
     case "upward-dog":
-      figure = <UpwardDog />;
+      figure = <UpwardDog playing={playing} />;
       break;
     case "childs-pose":
-      figure = <ChildsPose />;
+      figure = <ChildsPose playing={playing} />;
       break;
     case "downward-dog":
-      figure = <DownwardDog />;
+      figure = <DownwardDog playing={playing} />;
       break;
     case "wide-leg-bend":
-      figure = <WideLegBend />;
+      figure = <WideLegBend playing={playing} />;
       break;
   }
   if (!figure) return null;

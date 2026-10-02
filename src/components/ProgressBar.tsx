@@ -14,9 +14,6 @@ export function ProgressBar({ current, total }: ProgressBarProps) {
           style={{ width: `${progress}%` }}
         />
       </div>
-      <div className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
-        {current} of {total}
-      </div>
     </div>
   );
 }

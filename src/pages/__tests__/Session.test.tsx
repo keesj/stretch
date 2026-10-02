@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Session } from '../Session';
@@ -14,9 +14,8 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 const mockScheduleBeeps = vi.fn();
 const mockPlayHappyBeep = vi.fn();
-// Stable identity — a fresh getClock per render would change
-// startCountdown's identity, re-run the exercise-change effect and
-// cancel the countdown right after it starts.
+// Stable identity — a fresh getClock per render would change the
+// countdown's identity and cancel it right after it starts.
 const mockGetClock = vi.fn(() => performance.now() / 1000);
 
 vi.mock('../../hooks/useBeep', () => ({
@@ -29,98 +28,61 @@ vi.mock('../../hooks/useBeep', () => ({
   }),
 }));
 
-// Mutable state that the mock returns
+// Single shared timer state: every exercise section in a test reads/writes
+// this, so a test drives whichever section is under test.
 const timerState = {
-  timeLeft: 60,
+  timeLeft: 30,
   isRunning: false,
   isPaused: false,
-  onCompleteCb: null as null | (() => void),
 };
-// Stable identities (like the real hook's useCallbacks) — a fresh start/pause
-// per render would re-run the exercise-change effect and cancel the countdown.
+// One entry per useTimer call (one per exercise section), in mount order
+const timerInstances: Array<{ onComplete?: () => void }> = [];
+
 const mockStart = vi.fn(() => {
   timerState.isRunning = true;
 });
 const mockPause = vi.fn(() => {
   timerState.isRunning = false;
 });
-const mockSkip = vi.fn();
-const mockReset = vi.fn();
 
 vi.mock('../../hooks/useTimer', () => ({
   useTimer: (opts: any) => {
-    if (opts?.onComplete) {
-      timerState.onCompleteCb = opts.onComplete;
-    }
+    timerInstances.push({ onComplete: opts?.onComplete });
     return {
       timeLeft: timerState.timeLeft,
       isRunning: timerState.isRunning,
       isPaused: timerState.isPaused,
       start: mockStart,
       pause: mockPause,
-      reset: mockReset,
-      skip: mockSkip,
+      reset: vi.fn(),
+      skip: vi.fn(),
     };
   },
 }));
 
-function makeExercise(index: number) {
-  return {
-    id: `exercise-${index + 1}`,
-    title: index === 0 ? 'Upward Salute' : `Stretch ${index + 1}`,
-    duration: 60,
-    instructions: ['Raise arms', 'Hold'],
-    bodyParts: ['arms'],
-    difficulty: 'beginner',
-    illustration: '🤸‍♀️',
-    equipment: 'none',
-  };
-}
-
-const EXERCISES = [0, 1, 2].map(makeExercise);
-
-// Mutable workout state (initial values read at mount time by the mock)
 const workoutState = {
-  exercises: EXERCISES,
-  currentExerciseIndex: 0,
-  totalExercises: 8,
   isCompleted: false,
-  isPaused: false,
-  nextExerciseFn: [] as (() => void)[],
-  previousExerciseFn: [] as (() => void)[],
-  resetFn: [] as (() => void)[],
+  finishCount: 0,
   onCompleteCb: [] as ((session: any) => void)[],
   setCompleted: [] as ((completed: boolean) => void)[],
+  resetFn: [] as (() => void)[],
 };
 
-// Stateful mock: navigation actually changes React state so the
-// Session's exercise-change effects run, just like the real hook.
 vi.mock('../../hooks/useWorkout', async () => {
   const React = await import('react');
   return {
     useWorkout: (opts: any) => {
-      const [index, setIndex] = React.useState(workoutState.currentExerciseIndex);
       const [completed, setCompleted] = React.useState(workoutState.isCompleted);
       workoutState.onCompleteCb[0] = opts.onComplete;
       workoutState.setCompleted[0] = setCompleted;
-      const exercises = workoutState.exercises;
       return {
-        currentExercise: exercises[Math.min(index, exercises.length - 1)],
-        currentExerciseIndex: index,
-        totalExercises: workoutState.totalExercises,
         isCompleted: completed,
-        isPaused: workoutState.isPaused,
-        nextExercise: () => {
-          if (workoutState.nextExerciseFn[0]) workoutState.nextExerciseFn[0]();
-          setIndex((i) => Math.min(i + 1, workoutState.totalExercises - 1));
-        },
-        previousExercise: () => {
-          if (workoutState.previousExerciseFn[0]) workoutState.previousExerciseFn[0]();
-          setIndex((i) => Math.max(i - 1, 0));
+        finishWorkout: () => {
+          workoutState.finishCount += 1;
+          setCompleted(true);
         },
         reset: () => {
-          if (workoutState.resetFn[0]) workoutState.resetFn[0]();
-          setIndex(0);
+          workoutState.resetFn[0]?.();
           setCompleted(false);
         },
       };
@@ -128,10 +90,40 @@ vi.mock('../../hooks/useWorkout', async () => {
   };
 });
 
+const SCROLL_HEIGHT = 800;
+const SECTION_FRACTION = 0.85;
+const EXERCISES = 9; // wake-up-workout has nine stretches
+
+function getScrollContainer() {
+  return screen.getByTestId('session-scroll') as HTMLDivElement;
+}
+
+function sectionEl(index: number) {
+  return screen.getAllByTestId('exercise-section')[index];
+}
+
+// Which section the scroll position points at (mirrors the page's activeIndex)
+let currentSection = 0;
+
+/** Scope for queries: only the visible (active) exercise section */
+function activeSection() {
+  return within(sectionEl(currentSection));
+}
+
+async function scrollToSection(n: number) {
+  const el = getScrollContainer();
+  Object.defineProperty(el, 'clientHeight', { value: SCROLL_HEIGHT, configurable: true });
+  el.scrollTop = n * SCROLL_HEIGHT * SECTION_FRACTION;
+  act(() => {
+    el.dispatchEvent(new Event('scroll'));
+  });
+  currentSection = n;
+}
+
 /**
- * Wait real milliseconds OUTSIDE of act(). The page's countdown timers
- * call setState, and updates scheduled inside an async act() are dropped
- * in this environment — letting React process them normally (with the act
+ * Wait real milliseconds OUTSIDE of act(). The page's countdown timers call
+ * setState, and updates scheduled inside an async act() are dropped in this
+ * environment — letting React process them normally (with the act
  * environment flag off to keep the output clean) is what mirrors real use.
  */
 async function waitMs(ms: number) {
@@ -143,209 +135,149 @@ async function waitMs(ms: number) {
   }
 }
 
-describe('Session exercise transition', () => {
+describe('Session (scrollable feed)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReset();
     (localStorage.removeItem as ReturnType<typeof vi.fn>).mockReset();
-    timerState.timeLeft = 60;
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({ routineId: 'wake-up-workout' })
+    );
+    timerState.timeLeft = 30;
     timerState.isRunning = false;
     timerState.isPaused = false;
-    timerState.onCompleteCb = null;
-    // mockClear (not mockReset) to keep the isRunning implementations
+    timerInstances.length = 0;
     mockStart.mockClear();
     mockPause.mockClear();
-    mockSkip.mockReset();
     mockScheduleBeeps.mockReset();
     mockPlayHappyBeep.mockReset();
     mockGetClock.mockImplementation(() => performance.now() / 1000);
-    workoutState.currentExerciseIndex = 0;
-    workoutState.totalExercises = 8;
+    currentSection = 0;
     workoutState.isCompleted = false;
-    workoutState.nextExerciseFn[0] = vi.fn();
-    workoutState.previousExerciseFn[0] = vi.fn();
+    workoutState.finishCount = 0;
     workoutState.resetFn[0] = vi.fn();
   });
 
-  it('should track exercise transitions correctly', () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
+  it('renders the exercise feed with the next exercise already below', () => {
     render(<SessionContainer />);
-    expect(screen.getByText(/Exercise 1 of/i)).toBeInTheDocument();
-    expect(screen.getByText(/Upward Salute/i)).toBeInTheDocument();
+    // The wake-up routine bookends with Upward Salute (first and last)
+    expect(screen.getAllByText('Upward Salute')).toHaveLength(2);
+    // No appearing "Next up" card — the next exercise is part of the feed
+    expect(screen.getByText('Toe Touch')).toBeInTheDocument();
+    expect(screen.queryByText('Next up')).not.toBeInTheDocument();
   });
 
-  it('renders Previous, Next, and the clickable timer', () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    render(<SessionContainer />);
-    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
-    expect(screen.getByText('Next')).toBeInTheDocument();
-    expect(screen.getByText('Previous')).toBeInTheDocument();
-    // No visible Start/Pause button anymore — the timer is the control
-    expect(screen.queryByText('Start')).not.toBeInTheDocument();
-    expect(screen.queryByText('Pause')).not.toBeInTheDocument();
-  });
-
-  it('opens and closes the instructions overlay', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    render(<SessionContainer />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByText('Instructions'));
-    expect(await screen.findByText('Got it')).toBeInTheDocument();
-    expect(screen.getByText('Raise arms')).toBeInTheDocument();
-
-    await user.click(screen.getByText('Got it'));
-    await waitFor(() => expect(screen.queryByText('Got it')).not.toBeInTheDocument());
-  });
-
-  it('renders Back button and navigates back', async () => {
-    const mockNavigate = vi.fn();
-    vi.mocked((await import('react-router-dom')).useNavigate).mockReturnValue(mockNavigate);
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
+  it('has no Previous/Next buttons; the feed is scrolled instead', () => {
     render(<SessionContainer />);
     expect(screen.getByText('← Back')).toBeInTheDocument();
+    expect(screen.queryByText('Previous')).not.toBeInTheDocument();
+    expect(screen.queryByText('Next')).not.toBeInTheDocument();
+  });
+
+  it('shows swipe affordances for the active exercise', async () => {
+    render(<SessionContainer />);
+    // First exercise: swipe down only
+    expect(screen.getByText('swipe down')).toBeInTheDocument();
+    expect(screen.queryByText('swipe up')).not.toBeInTheDocument();
+
+    await scrollToSection(1);
+    expect(screen.getByText('swipe up')).toBeInTheDocument();
+    expect(screen.getByText('Exercise 2 of 9')).toBeInTheDocument();
+  });
+
+  it('backing out navigates home and resets the workout', async () => {
+    const mockNavigate = vi.fn();
+    vi.mocked((await import('react-router-dom')).useNavigate).mockReturnValue(mockNavigate);
+    render(<SessionContainer />);
 
     await userEvent.setup().click(screen.getByText('← Back'));
+    expect(workoutState.resetFn[0]).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 
-  it('disables Previous button on first exercise', () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
+  it('tapping the timer runs the 3-2-1 countdown, then the exercise', async () => {
     render(<SessionContainer />);
-    expect(screen.getByText('Previous')).toBeDisabled();
-  });
-
-  it('clicking the timer starts the countdown', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    render(<SessionContainer />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Start' }));
-
-    // Start button → startCountdown() → playBeep (mocked) → setTimeout → playFinalBeep → start()
-    // Since playBeep and playFinalBeep are mocked, setTimeout still fires after 3000ms in node
-    // But in jsdom, setTimeout is real, so we need to wait for it
-  
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3100));
-    });
-  
-    expect(mockStart).toHaveBeenCalled();
-  });
-
-  it('shows a 3-2-1 countdown before the exercise starts', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    render(<SessionContainer />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Start' }));
+    await userEvent.setup().click(activeSection().getByRole('button', { name: 'Start' }));
 
     expect(screen.getByText('Get ready…')).toBeInTheDocument();
-    // The lead-in is shown explicitly: 60s stretch + 3s countdown
-    expect(screen.getByText('60')).toBeInTheDocument();
-    expect(screen.getByText('+ 3')).toBeInTheDocument();
+    // The lead-in is shown explicitly: 30s stretch + 3s countdown
+    expect(activeSection().getByText('30')).toBeInTheDocument();
+    expect(activeSection().getByText('+ 3')).toBeInTheDocument();
 
-    // rAF-driven countdown: ~3s outside act so state updates land normally
     await waitMs(3200);
 
     expect(mockStart).toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.queryByText('Get ready…')).not.toBeInTheDocument()
     );
-    // Back to the plain exercise timer, no lead-in suffix
-    expect(screen.getByText('60')).toBeInTheDocument();
-    expect(screen.queryByText('+ 3')).not.toBeInTheDocument();
+    expect(activeSection().queryByText('+ 3')).not.toBeInTheDocument();
   }, 20000);
 
-  it('resumes from the paused time without a countdown', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-    // Paused partway through the exercise (21s of a 60s stretch left)
-    timerState.isRunning = false;
-    timerState.timeLeft = 21;
-
+  it('pauses and resumes without a countdown', async () => {
     render(<SessionContainer />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: 'Resume' }));
-    expect(mockStart).toHaveBeenCalled();
-    // No 3-2-1 on resume (a countdown would re-render with "Get ready…")
-    expect(screen.queryByText('Get ready…')).not.toBeInTheDocument();
-    expect(screen.queryByText('+ 3')).not.toBeInTheDocument();
-    expect(screen.getByText('21')).toBeInTheDocument();
-  });
+    await user.click(activeSection().getByRole('button', { name: 'Start' }));
+    await waitMs(3200);
 
-  it('toggle to Pause when running', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    timerState.isRunning = true;
-    render(<SessionContainer />);
-
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Pause' }));
+    await user.click(activeSection().getByRole('button', { name: 'Pause' }));
     expect(mockPause).toHaveBeenCalled();
-  });
 
-  it('Next button goes to next exercise', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-    workoutState.totalExercises = 3;
+    await user.click(activeSection().getByRole('button', { name: 'Resume' }));
+    expect(screen.queryByText('Get ready…')).not.toBeInTheDocument();
+    expect(activeSection().getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  }, 20000);
 
+  it('scrolling to the next exercise does not auto-start it', async () => {
     render(<SessionContainer />);
+    await scrollToSection(1);
+    expect(screen.getByText('Exercise 2 of 9')).toBeInTheDocument();
 
-    await userEvent.setup().click(screen.getByText('Next'));
-
-    expect(workoutState.nextExerciseFn[0]).toHaveBeenCalled();
-  });
-
-  it('Next button does not auto-start the next exercise', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-    workoutState.totalExercises = 3;
-
-    render(<SessionContainer />);
-
-    await userEvent.setup().click(screen.getByText('Next'));
-
-    expect(screen.getByText('Exercise 2 of 3')).toBeInTheDocument();
-
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3100));
-    });
+    await waitMs(3500);
 
     expect(mockStart).not.toHaveBeenCalled();
     expect(mockScheduleBeeps).not.toHaveBeenCalled();
-  });
+  }, 20000);
 
-  it('Previous button does not auto-start the previous exercise', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-    workoutState.currentExerciseIndex = 2;
-    workoutState.totalExercises = 3;
-
+  it('scrolling away pauses the running exercise; scrolling back shows it paused', async () => {
     render(<SessionContainer />);
+    const user = userEvent.setup();
 
-    await userEvent.setup().click(screen.getByText('Previous'));
+    await user.click(activeSection().getByRole('button', { name: 'Start' }));
+    await waitMs(3200);
+    expect(activeSection().getByRole('button', { name: 'Pause' })).toBeInTheDocument();
 
-    expect(screen.getByText('Exercise 2 of 3')).toBeInTheDocument();
+    await scrollToSection(1);
+    expect(mockPause).toHaveBeenCalled();
 
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3100));
-    });
+    await scrollToSection(0);
+    expect(activeSection().getByRole('button', { name: 'Resume' })).toBeInTheDocument();
+  }, 20000);
 
-    expect(mockStart).not.toHaveBeenCalled();
-  });
-
-  it('auto-starts the next exercise with a 5s transition countdown when the timer completes', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-    workoutState.totalExercises = 3;
-
+  it('completing an exercise scrolls to the next one with a 5s transition countdown', async () => {
     render(<SessionContainer />);
+    const el = getScrollContainer();
+    Object.defineProperty(el, 'clientHeight', { value: SCROLL_HEIGHT, configurable: true });
+    const scrollToSpy = vi.fn();
+    Object.defineProperty(el, 'scrollTo', { value: scrollToSpy, configurable: true });
 
     act(() => {
-      timerState.onCompleteCb?.();
+      timerInstances[0].onComplete?.();
     });
 
-    expect(screen.getByText('Exercise 2 of 3')).toBeInTheDocument();
-    expect(mockScheduleBeeps).toHaveBeenCalledTimes(1);
+    // The completed state shows briefly, then the session scrolls on
+    await waitMs(1600);
+    expect(scrollToSpy).toHaveBeenCalledWith({
+      top: SCROLL_HEIGHT * SECTION_FRACTION,
+      behavior: 'smooth',
+    });
+
+    // Simulate the scroll settling on exercise 2
+    el.scrollTop = SCROLL_HEIGHT * SECTION_FRACTION;
+    act(() => {
+      el.dispatchEvent(new Event('scroll'));
+    });
+    expect(screen.getByText('Exercise 2 of 9')).toBeInTheDocument();
     expect(mockScheduleBeeps).toHaveBeenCalledWith([
       { frequency: 800, at: 0, duration: 0.1 },
       { frequency: 800, at: 1, duration: 0.1 },
@@ -355,16 +287,36 @@ describe('Session exercise transition', () => {
       { frequency: 1200, at: 5, duration: 0.3 },
     ]);
 
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 5200));
-    });
-
+    await waitMs(5200);
     expect(mockStart).toHaveBeenCalled();
   }, 20000);
 
-  it('plays the happy beep when the workout completes', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
+  it('completing the final exercise finishes the workout with a happy beep', async () => {
+    render(<SessionContainer />);
 
+    act(() => {
+      timerInstances[EXERCISES - 1].onComplete?.();
+    });
+
+    await waitMs(1600);
+    expect(workoutState.finishCount).toBe(1);
+    expect(mockPlayHappyBeep).toHaveBeenCalledTimes(1);
+  }, 20000);
+
+  it('completing the workout navigates to finished', async () => {
+    const finishNavigate = vi.fn();
+    vi.mocked((await import('react-router-dom')).useNavigate).mockReturnValue(finishNavigate);
+    render(<SessionContainer />);
+
+    const sessionData = { routine: 'wake-up-workout', exercises: [] };
+    act(() => {
+      workoutState.onCompleteCb[0]?.(sessionData);
+    });
+
+    expect(finishNavigate).toHaveBeenCalledWith('/finished', { state: { session: sessionData } });
+  });
+
+  it('plays the happy beep when the workout completes', async () => {
     render(<SessionContainer />);
     expect(mockPlayHappyBeep).not.toHaveBeenCalled();
 
@@ -375,89 +327,26 @@ describe('Session exercise transition', () => {
     expect(mockPlayHappyBeep).toHaveBeenCalledTimes(1);
   });
 
-  it('Previous button goes to previous exercise when not on first', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-    workoutState.currentExerciseIndex = 2;
-    workoutState.totalExercises = 3;
-
+  it('opens and closes the instructions overlay for the active exercise', async () => {
     render(<SessionContainer />);
+    const user = userEvent.setup();
 
-    await userEvent.setup().click(screen.getByText('Previous'));
+    await user.click(screen.getByText('Instructions'));
+    expect(await screen.findByText('Got it')).toBeInTheDocument();
+    expect(screen.getByText('Stand tall with feet hip-width apart')).toBeInTheDocument();
 
-    expect(workoutState.previousExerciseFn[0]).toHaveBeenCalled();
+    await user.click(screen.getByText('Got it'));
+    await waitFor(() => expect(screen.queryByText('Got it')).not.toBeInTheDocument());
   });
 
-  it('Previous button does nothing when on first exercise (already covered by disabled state)', () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-    render(<SessionContainer />);
-    expect(screen.getByText('Previous')).toBeDisabled();
-  });
-
-  it('completing workout navigates to finished', async () => {
-    const finishNavigate = vi.fn();
-    vi.mocked((await import('react-router-dom')).useNavigate).mockReturnValue(finishNavigate);
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    workoutState.isCompleted = true;
-
-    render(<SessionContainer />);
-
-    // Simulate the onComplete callback from useWorkout
-    const sessionData = { routine: 'wake-up-workout', exercises: [] };
-    act(() => {
-      workoutState.onCompleteCb[0]?.(sessionData);
-    });
-
-    expect(finishNavigate).toHaveBeenCalledWith('/finished', { state: { session: sessionData } });
-  });
-
-  it('shows exercise instructions in the overlay', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
+  it('shows exercise details in the instructions overlay', async () => {
     render(<SessionContainer />);
     await userEvent.setup().click(screen.getByText('Instructions'));
 
-    expect(await screen.findByText('Raise arms')).toBeInTheDocument();
-    expect(screen.getByText('Hold')).toBeInTheDocument();
-  });
-
-  it('shows the correct exercise from wake-up-workout', () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    render(<SessionContainer />);
-    expect(screen.getByText('Upward Salute')).toBeInTheDocument();
-  });
-
-  it('showNextPreview effect sets showNextPreview when timeLeft <= 15', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    // Mock to show transition message
-    render(<SessionContainer />);
-
-    // Since we control the timer mock, we can test the transitions
-    // The effects use showNextPreview which is rendered conditionally
-    expect(screen.getByText(/Exercise 1 of/i)).toBeInTheDocument();
-  });
-
-  it('showTransitionMessage effect handles timeLeft <= 8', async () => {
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    render(<SessionContainer />);
-
-    // The transition message would show when timeLeft <= 8
-    // Since timerState is controlled externally, this covers the useEffect branches
-    expect(screen.getByText(/Upward Salute/i)).toBeInTheDocument();
-  });
-
-  it('handleReturnHome calls stopCountdown and navigate', async () => {
-    const mockNavigate = vi.fn();
-    vi.mocked((await import('react-router-dom')).useNavigate).mockReturnValue(mockNavigate);
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify({ routineId: 'wake-up-workout' }));
-
-    render(<SessionContainer />);
-
-    await userEvent.setup().click(screen.getByText('← Back'));
-    expect(mockNavigate).toHaveBeenCalledWith('/');
+    expect(await screen.findByText('Stand tall with feet hip-width apart')).toBeInTheDocument();
+    expect(screen.getByText('Easy')).toBeInTheDocument();
+    expect(screen.getByText('30s')).toBeInTheDocument();
+    expect(screen.getByText('spine')).toBeInTheDocument();
   });
 });
 

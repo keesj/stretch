@@ -47,4 +47,11 @@ describe("StretchAnimation", () => {
     const { container } = render(<StretchAnimation stretch={mk({ animation, title: animation })} />);
     expect(container.querySelector("svg")).toBeInTheDocument();
   });
+
+  it("renders a still pose when not playing", () => {
+    const { container } = render(
+      <StretchAnimation stretch={mk({ animation: "downward-dog" })} playing={false} />
+    );
+    expect(container.querySelector("svg")).toBeInTheDocument();
+  });
 });

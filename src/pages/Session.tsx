@@ -1,16 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ExerciseCard } from "../components/ExerciseCard";
+import { ExerciseSection, type ExercisePhase } from "../components/ExerciseSection";
 import { StretchAnimation } from "../components/StretchAnimation";
-import { Timer } from "../components/Timer";
 import { ProgressBar } from "../components/ProgressBar";
 import { Button } from "../components/Button";
-import { useTimer } from "../hooks/useTimer";
 import { useWorkout } from "../hooks/useWorkout";
 import { useBeep } from "../hooks/useBeep";
 import { useWakeLock } from "../hooks/useWakeLock";
-import { Card } from "../components/Card";
+import { formatDuration } from "../utils/timer";
 import { loadFromStorage, DEFAULT_SETTINGS } from "../utils/storage";
 import type { Stretch } from "../types/stretch";
 import type { Routine } from "../types/routine";
@@ -21,30 +19,32 @@ import stretchesData from "../data/stretches.json";
 const routines = routinesData as Routine[];
 const stretches = stretchesData as Stretch[];
 
+const difficultyColors = {
+  easy: "text-green-600 dark:text-green-400",
+  medium: "text-yellow-600 dark:text-yellow-400",
+  hard: "text-red-600 dark:text-red-400",
+};
+
+// Each exercise fills 85% of the viewport so the next one peeks in at the
+// bottom — the "next up" card is now always there, one scroll away.
+const SECTION_FRACTION = 0.85;
+// Let the "Completed" state land before scrolling on to the next exercise
+const ADVANCE_DELAY_MS = 1500;
+
 export function Session() {
   const navigate = useNavigate();
   const [routineId, setRoutineId] = useState<string>(routines[0].id);
   const [isLoading, setIsLoading] = useState(true);
   const [showInstructions, setShowInstructions] = useState(false);
-  const [showNextPreview, setShowNextPreview] = useState(false);
-  const [showTransitionMessage, setShowTransitionMessage] = useState(false);
-  const countdownRafRef = useRef<number | null>(null);
-  const countdownCompleteRef = useRef(false);
-  const autoAdvanceRef = useRef(false);
-  const prevCompletedRef = useRef(false);
-  // 3-2-1 shown while the start countdown runs (null otherwise)
-  const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
-  // Length of the lead-in countdown (3s to start, 5s between exercises),
-  // included in the displayed total and marked on the ring
-  const [countdownSeconds, setCountdownSeconds] = useState(3);
+  // Which exercise is in view — the scroll position is the source of truth
+  const [activeIndex, setActiveIndex] = useState(0);
+  // Exercise that should run its 5s transition countdown once it becomes active
+  const [pendingAutoStart, setPendingAutoStart] = useState<number | null>(null);
+  // Phase of every section (the wake lock follows the active one)
+  const [phases, setPhases] = useState<Record<number, ExercisePhase>>({});
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const advanceTimeoutRef = useRef<number | null>(null);
 
-  const cancelCountdown = useCallback(() => {
-    if (countdownRafRef.current != null) {
-      cancelAnimationFrame(countdownRafRef.current);
-      countdownRafRef.current = null;
-    }
-    setCountdownNumber(null);
-  }, []);
   const [soundEnabled] = useState(() =>
     loadFromStorage("settings", DEFAULT_SETTINGS).soundEnabled
   );
@@ -75,16 +75,9 @@ export function Session() {
       .filter((s): s is Stretch => !!s)
   , [routine]);
 
-  const {
-    currentExercise,
-    currentExerciseIndex,
-    totalExercises,
-    isCompleted,
-    isPaused,
-    nextExercise,
-    previousExercise,
-    reset,
-  } = useWorkout({
+  const totalExercises = exerciseStretches.length;
+
+  const { isCompleted, finishWorkout, reset } = useWorkout({
     routine,
     stretches: exerciseStretches,
     onComplete: (session) => {
@@ -92,31 +85,12 @@ export function Session() {
     },
   });
 
-  const { timeLeft, start, pause, reset: resetTimer, skip, isRunning } = useTimer({
-    initialTime: currentExercise.duration,
-    onComplete: () => {
-      autoAdvanceRef.current = true;
-      nextExercise();
-    },
-  });
-
-  // True once the current exercise's timer has run (so "Paused" is shown
-  // instead of "Ready" when the user pauses partway through).
-  const isStarted = isRunning || timeLeft < currentExercise.duration;
-  // Lead-in seconds still to go (shown as "60 + 3" and on the ring)
-  const countdownRemaining = countdownNumber != null
-    ? countdownNumber
-    : !isStarted && !isPaused
-      ? countdownSeconds
-      : null;
-  const displayTime =
-    countdownRemaining != null
-      ? currentExercise.duration + countdownRemaining
-      : timeLeft;
-
   const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
-  useWakeLock({ isActive: isRunning && !isPaused || countdownNumber != null });
 
+  const activePhase = phases[activeIndex];
+  useWakeLock({ isActive: activePhase === "running" || activePhase === "countdown" });
+
+  const prevCompletedRef = useRef(false);
   useEffect(() => {
     if (isCompleted && !prevCompletedRef.current) {
       playHappyBeep();
@@ -124,237 +98,132 @@ export function Session() {
     prevCompletedRef.current = isCompleted;
   }, [isCompleted, playHappyBeep]);
 
-  const startCountdown = useCallback((seconds = 3) => {
-    cancelCountdown();
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || el.clientHeight <= 0) return;
+    const sectionHeight = el.clientHeight * SECTION_FRACTION;
+    const index = Math.min(
+      Math.max(Math.round(el.scrollTop / sectionHeight), 0),
+      totalExercises - 1
+    );
+    setActiveIndex((prev) => (prev === index ? prev : index));
+  }, [totalExercises]);
 
-    countdownCompleteRef.current = false;
-    setCountdownNumber(seconds);
-    setCountdownSeconds(seconds);
+  const scrollToIndex = useCallback((index: number) => {
+    const el = scrollRef.current;
+    if (!el || el.clientHeight <= 0) return;
+    el.scrollTo({
+      top: index * el.clientHeight * SECTION_FRACTION,
+      behavior: "smooth",
+    });
+  }, []);
 
-    // Schedule all beeps on the Web Audio clock so the countdown spacing is
-    // sample-accurate instead of riding on setTimeout jitter.
-    scheduleBeeps([
-      ...Array.from({ length: seconds }, (_, i) => ({
-        frequency: 800,
-        at: i,
-        duration: 0.1,
-      })),
-      { frequency: 1200, at: seconds, duration: 0.3 },
-    ]);
+  const handlePhaseChange = useCallback((index: number, phase: ExercisePhase) => {
+    setPhases((prev) => (prev[index] === phase ? prev : { ...prev, [index]: phase }));
+  }, []);
 
-    // Derive the countdown from the clock every frame (same clock family
-    // as the beeps) so the numbers and the start stay in sync with the
-    // sound and self-correct after dropped frames.
-    const t0 = getClock();
-    const t0Perf = performance.now() / 1000;
-    const elapsedAt = () =>
-      Math.max(getClock() - t0, performance.now() / 1000 - t0Perf);
+  const handleAutoStartConsumed = useCallback(() => {
+    setPendingAutoStart(null);
+  }, []);
 
-    const tick = () => {
-      const elapsed = elapsedAt();
-      if (elapsed >= seconds) {
-        countdownRafRef.current = null;
-        setCountdownNumber(null);
-        countdownCompleteRef.current = true;
-        if (!isCompleted) {
-          start();
-        }
-        return;
+  const handleExerciseCompleted = useCallback(
+    (index: number) => {
+      if (advanceTimeoutRef.current != null) {
+        window.clearTimeout(advanceTimeoutRef.current);
       }
-      setCountdownNumber(Math.max(seconds - Math.floor(elapsed), 1));
-      countdownRafRef.current = requestAnimationFrame(tick);
+      advanceTimeoutRef.current = window.setTimeout(() => {
+        if (index >= totalExercises - 1) {
+          finishWorkout();
+        } else {
+          setPendingAutoStart(index + 1);
+          scrollToIndex(index + 1);
+        }
+      }, ADVANCE_DELAY_MS);
+    },
+    [totalExercises, finishWorkout, scrollToIndex]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimeoutRef.current != null) {
+        window.clearTimeout(advanceTimeoutRef.current);
+      }
     };
-    countdownRafRef.current = requestAnimationFrame(tick);
-  }, [cancelCountdown, scheduleBeeps, getClock, start, isCompleted]);
-
-  const stopCountdown = useCallback(() => {
-    cancelCountdown();
-    countdownCompleteRef.current = false;
-  }, [cancelCountdown]);
-
-  const goToNext = useCallback(() => {
-    if (currentExerciseIndex < totalExercises - 1) {
-      stopCountdown();
-      skip();
-      nextExercise();
-    }
-  }, [currentExerciseIndex, totalExercises, stopCountdown, skip, nextExercise]);
-
-  const goToPrevious = useCallback(() => {
-    stopCountdown();
-    if (currentExerciseIndex > 0) {
-      previousExercise();
-    }
-  }, [stopCountdown, previousExercise, currentExerciseIndex]);
-
-  const handleTimerClick = useCallback(() => {
-    if (countdownNumber != null) {
-      stopCountdown();
-      return;
-    }
-    if (isRunning) {
-      pause();
-    } else if (isStarted) {
-      // Resume from a pause — straight back to the paused time, no countdown
-      start();
-    } else {
-      startCountdown();
-    }
-  }, [countdownNumber, stopCountdown, isRunning, isStarted, pause, start, startCountdown]);
-
-  useEffect(() => {
-    stopCountdown();
-    setCountdownSeconds(3);
-    resetTimer(currentExercise.duration);
-
-    // Only auto-start the next exercise when the previous one finished
-    // naturally (timer hit 0). Manual Next/Prev stays in "Ready". The
-    // transition countdown is longer than the initial 3-2-1 so there is
-    // time to move into the next position.
-    const shouldAutoStart = autoAdvanceRef.current && currentExerciseIndex > 0 && !isCompleted;
-    autoAdvanceRef.current = false;
-    if (shouldAutoStart) {
-      startCountdown(5);
-    }
-  }, [currentExercise, resetTimer, currentExerciseIndex, isCompleted, startCountdown, stopCountdown]);
-
-  useEffect(() => {
-    if (!isPaused && !isCompleted && timeLeft <= 8 && currentExerciseIndex < totalExercises - 1) {
-      setShowTransitionMessage(true);
-    } else {
-      setShowTransitionMessage(false);
-    }
-  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
-
-  useEffect(() => {
-    if (!isPaused && !isCompleted && timeLeft <= 15 && currentExerciseIndex < totalExercises - 1) {
-      setShowNextPreview(true);
-    } else {
-      setShowNextPreview(false);
-    }
-  }, [timeLeft, isPaused, isCompleted, currentExerciseIndex, totalExercises]);
-
-  useEffect(() => cancelCountdown, [cancelCountdown]);
+  }, []);
 
   const handleReturnHome = useCallback(() => {
-    stopCountdown();
     reset();
-    resetTimer(0);
     navigate("/");
-  }, [stopCountdown, reset, resetTimer, navigate]);
+  }, [reset, navigate]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-calm-50 dark:bg-gray-900">
+      <div className="flex min-h-screen items-center justify-center bg-calm-50 dark:bg-gray-900">
         <div className="text-gray-600 dark:text-gray-400">Loading...</div>
       </div>
     );
   }
+
+  const activeExercise = exerciseStretches[activeIndex];
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="px-4 py-6 pb-24 max-w-md mx-auto"
+      className="mx-auto flex h-[100dvh] max-w-md flex-col"
     >
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-4 px-4 py-3">
         <button
           onClick={handleReturnHome}
-          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+          className="shrink-0 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           ← Back
         </button>
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          Exercise {currentExerciseIndex + 1} of {totalExercises}
+        <div className="relative flex-1">
+          <ProgressBar current={activeIndex + 1} total={totalExercises} />
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="rounded-full bg-calm-50 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+              Exercise {activeIndex + 1} of {totalExercises}
+            </span>
+          </span>
         </div>
       </div>
-      <ProgressBar current={currentExerciseIndex + 1} total={totalExercises} />
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentExercise.id}
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.3 }}
-        >
-          <ExerciseCard
-            exercise={currentExercise}
-            aside={
-              <motion.button
-                type="button"
-                onClick={handleTimerClick}
-                aria-label={
-                  countdownNumber != null
-                    ? "Cancel countdown"
-                    : isRunning
-                      ? "Pause"
-                      : isStarted
-                        ? "Resume"
-                        : "Start"
-                }
-                animate={
-                  countdownNumber == null && !isRunning && !isStarted
-                    ? { scale: [1, 1.03, 1] }
-                    : { scale: 1 }
-                }
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                whileTap={{ scale: 0.96 }}
-                className="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                <Timer
-                  displayTime={displayTime}
-                  isRunning={isRunning}
-                  isCounting={countdownNumber != null}
-                  isPaused={
-                    isPaused ||
-                    (isStarted && !isRunning && timeLeft > 0)
-                  }
-                  totalDuration={currentExercise.duration + countdownSeconds}
-                  countdownSeconds={countdownSeconds}
-                  countdownRemaining={countdownRemaining}
-                  breathing
-                  label={showTransitionMessage ? "Almost Done" : undefined}
-                  size={200}
-                />
-              </motion.button>
-            }
-          />
-        </motion.div>
-      </AnimatePresence>
-
-      {showNextPreview && currentExerciseIndex < totalExercises - 1 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="my-6"
-        >
-          <Card className="p-4 bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800">
-            <div className="text-center">
-              <div className="text-sm text-primary-600 dark:text-primary-300 mb-2">
-                Next up
-              </div>
-              <div className="text-lg font-semibold mb-1 text-primary-700 dark:text-primary-200">
-                {exerciseStretches[currentExerciseIndex + 1]?.title}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">
-                {exerciseStretches[currentExerciseIndex + 1]?.illustration}
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      )}
-
-      <button
-        onClick={() => setShowInstructions(true)}
-        className="text-sm text-primary-600 dark:text-primary-400 hover:underline mb-3"
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        data-testid="session-scroll"
+        className="flex-1 snap-y snap-mandatory overflow-y-auto"
       >
-        Instructions
-      </button>
+        {exerciseStretches.map((exercise, index) => (
+          <section
+            // The same stretch can appear twice in a routine (e.g. as an
+            // opener and closer), so the index disambiguates the key
+            key={`${exercise.id}-${index}`}
+            inert={index !== activeIndex}
+            className="h-[85%] snap-start"
+          >
+            <ExerciseSection
+              exercise={exercise}
+              index={index}
+              isActive={index === activeIndex}
+              isLast={index === totalExercises - 1}
+              autoStart={pendingAutoStart === index}
+              onAutoStartConsumed={handleAutoStartConsumed}
+              onCompleted={handleExerciseCompleted}
+              onPhaseChange={handlePhaseChange}
+              scheduleBeeps={scheduleBeeps}
+              getClock={getClock}
+              onShowInstructions={() => setShowInstructions(true)}
+            />
+          </section>
+        ))}
+        <div className="h-[15%]" aria-hidden="true" />
+      </div>
 
       <AnimatePresence>
-        {showInstructions && (
+        {showInstructions && activeExercise && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -371,19 +240,37 @@ export function Session() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col items-center text-center mb-4">
-                {currentExercise.animation ? (
+                {activeExercise.animation ? (
                   <div className="w-full max-w-[220px] mb-3">
-                    <StretchAnimation stretch={currentExercise} />
+                    <StretchAnimation stretch={activeExercise} />
                   </div>
                 ) : (
-                  <div className="text-6xl mb-3">{currentExercise.illustration}</div>
+                  <div className="text-6xl mb-3">{activeExercise.illustration}</div>
                 )}
                 <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-                  {currentExercise.title}
+                  {activeExercise.title}
                 </h2>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${difficultyColors[activeExercise.difficulty]}`}
+                  >
+                    {activeExercise.difficulty.charAt(0).toUpperCase() + activeExercise.difficulty.slice(1)}
+                  </span>
+                  <span className="rounded-full bg-calm-100 px-3 py-1 text-xs text-calm-700 dark:bg-calm-900/50 dark:text-calm-300">
+                    {formatDuration(activeExercise.duration)}
+                  </span>
+                  {activeExercise.bodyParts.map((part) => (
+                    <span
+                      key={part}
+                      className="rounded-full bg-calm-100 px-3 py-1 text-xs text-calm-700 dark:bg-calm-900/50 dark:text-calm-300"
+                    >
+                      {part}
+                    </span>
+                  ))}
+                </div>
               </div>
               <ol className="space-y-2 mb-6">
-                {currentExercise.instructions.map((instruction, index) => (
+                {activeExercise.instructions.map((instruction, index) => (
                   <li key={index} className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
                     <span className="font-semibold text-primary-600 dark:text-primary-400">
                       {index + 1}.
@@ -399,21 +286,6 @@ export function Session() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div className="mt-8 flex gap-3">
-        <Button
-          variant="outline"
-          onClick={goToPrevious}
-          disabled={currentExerciseIndex === 0}
-          className="flex-1"
-        >
-          Previous
-        </Button>
-
-        <Button onClick={goToNext} className="flex-1">
-          Next
-        </Button>
-      </div>
     </motion.div>
   );
 }
