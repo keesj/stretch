@@ -196,20 +196,20 @@ describe("milestone days", () => {
     });
   });
 
-  it("scores a short hold on a milestone day at 0 points", () => {
+  it("scores a regular hold on a milestone day at 1 point", () => {
     const state: PlankChallengeState = {
       startedAt: "2026-03-01",
       days: [{ date: "2026-03-10", seconds: 120 }],
     };
     expect(getDailyPoints(challenge, state, [], "2026-03-10")).toEqual({
-      plank: 0,
+      plank: 1,
       routine: 0,
-      total: 0,
+      total: 1,
     });
     expect(getOverallTotals(challenge, state, [])).toEqual({
-      plank: 0,
+      plank: 1,
       routine: 0,
-      total: 0,
+      total: 1,
     });
   });
 });

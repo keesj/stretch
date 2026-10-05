@@ -82,9 +82,10 @@ describe("pointsForHold", () => {
 });
 
 describe("pointsForHold on milestone days", () => {
-  it("scores 0 below the milestone hold", () => {
-    expect(pointsForHold(challenge, 179, 10)).toBe(0);
-    expect(pointsForHold(challenge, 120, 10)).toBe(0);
+  it("still scores the regular day for a hold below the milestone hold", () => {
+    expect(pointsForHold(challenge, 179, 10)).toBe(1);
+    expect(pointsForHold(challenge, 120, 10)).toBe(1);
+    expect(pointsForHold(challenge, 60, 10)).toBe(0);
   });
 
   it("scores the milestone points at the milestone hold and caps them", () => {
@@ -160,8 +161,16 @@ describe("getChallengeStatus", () => {
     expect(status.score).toBeCloseTo(11);
   });
 
-  it("a short hold on a milestone day does not count as done", () => {
+  it("scores a regular hold on a milestone day as done for 1 point", () => {
     const state = mkState(START, [[addDays(START, 9), 120]]);
+    const status = getChallengeStatus(challenge, state, onDay(9));
+    expect(status.todayIsMilestone).toBe(true);
+    expect(status.todayPoints).toBe(1);
+    expect(status.todayDone).toBe(true);
+  });
+
+  it("a hold below the base on a milestone day does not count as done", () => {
+    const state = mkState(START, [[addDays(START, 9), 60]]);
     const status = getChallengeStatus(challenge, state, onDay(9));
     expect(status.todayIsMilestone).toBe(true);
     expect(status.todayPoints).toBe(0);
@@ -431,9 +440,20 @@ describe("getChallengeProgress", () => {
     expect(progress.plankTotal).toBe(4);
   });
 
-  it("marks a past milestone day with a short hold as missed", () => {
-    // Day 10 held 2:00, below the 3:00 milestone; today is day 11
+  it("counts a regular hold on a past milestone day for 1 point", () => {
+    // Day 10 held the regular 2:00 (no 3:00 milestone); today is day 11
     const state = mkState(START, [[addDays(START, 9), 120]]);
+    const progress = getChallengeProgress(challenge, state, onDay(10));
+    expect(progress.days[9]).toMatchObject({
+      dayNumber: 10,
+      plankPoints: 1,
+      isMissed: false,
+    });
+  });
+
+  it("marks a past milestone day without the base hold as missed", () => {
+    // Day 10 held only 1:00, below the 2:00 base; today is day 11
+    const state = mkState(START, [[addDays(START, 9), 60]]);
     const progress = getChallengeProgress(challenge, state, onDay(10));
     expect(progress.days[9]).toMatchObject({
       dayNumber: 10,

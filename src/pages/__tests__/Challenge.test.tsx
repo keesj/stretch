@@ -224,6 +224,10 @@ describe('Challenge page', () => {
     const user = userEvent.setup();
 
     expect(await screen.findByText('Day 10 of 30')).toBeInTheDocument();
+    // The regular plank is still offered on a milestone day
+    expect(
+      await screen.findByText('Begin 2:00 Plank (+1 pt)')
+    ).toBeInTheDocument();
     const begin = await screen.findByText('Begin 3:00 Plank (+2 pts)');
     expect(await screen.findByText(/Milestone day/)).toBeInTheDocument();
     expect(screen.queryByText(/Hold 2:30/)).not.toBeInTheDocument();

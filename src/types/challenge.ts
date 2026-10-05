@@ -14,9 +14,9 @@ export interface Challenge {
    * when N is 10) requires the longer milestone hold. 0 disables it.
    */
   milestoneEvery: number;
-  /** Seconds required to complete a milestone day */
+  /** Seconds of the milestone hold, which upgrades a milestone day to the milestone points */
   milestoneSeconds: number;
-  /** Total points a completed milestone day is worth */
+  /** Points a milestone day is worth when the milestone hold is completed */
   milestonePoints: number;
   illustration: string;
 }

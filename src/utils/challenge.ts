@@ -112,16 +112,6 @@ export function isMilestoneDay(challenge: Challenge, dayNumber: number): boolean
   );
 }
 
-/** Seconds required to complete the given day (milestone days are longer). */
-export function holdSecondsForDay(
-  challenge: Challenge,
-  dayNumber: number
-): number {
-  return isMilestoneDay(challenge, dayNumber)
-    ? challenge.milestoneSeconds
-    : challenge.baseSeconds;
-}
-
 /**
  * 1-based day number for a date, or 0 when the challenge has no start
  * date or the date falls outside the challenge window.
@@ -137,9 +127,10 @@ export function dayNumberForDate(
 }
 
 /**
- * Points for a hold on a given challenge day. Milestone days require the
- * full milestone hold and pay the milestone points total; other days pay
- * 1 at base, 1 + bonus at base + bonusSeconds.
+ * Points for a hold on a given challenge day. Milestone days pay the
+ * milestone points total for the full milestone hold, while the regular
+ * base hold still pays 1; other days pay 1 at base, 1 + bonus at base +
+ * bonusSeconds.
  */
 export function pointsForHold(
   challenge: Challenge,
@@ -147,7 +138,13 @@ export function pointsForHold(
   dayNumber: number
 ): number {
   if (isMilestoneDay(challenge, dayNumber)) {
-    return seconds >= challenge.milestoneSeconds ? challenge.milestonePoints : 0;
+    // The milestone hold upgrades the day to the milestone points total;
+    // the regular base hold still completes the day for 1 (the recovery
+    // bonus tier does not apply on milestone days).
+    if (seconds >= challenge.milestoneSeconds) {
+      return challenge.milestonePoints;
+    }
+    return seconds >= challenge.baseSeconds ? 1 : 0;
   }
   if (seconds >= challenge.baseSeconds + challenge.bonusSeconds) {
     return 1 + challenge.bonusPoints;
@@ -300,10 +297,11 @@ export function getChallengeProgress(
     const holdSeconds = secondsByDate.get(cursor) ?? 0;
 
     let plankPoints = 0;
-    // A past day without the required hold is a miss (0 points, no
-    // penalty). Today is not a miss until it has passed.
-    const requiredSeconds = holdSecondsForDay(challenge, dayNumber);
-    const isMissed = !isFuture && !isToday && holdSeconds < requiredSeconds;
+    // A past day without the base hold is a miss (0 points, no penalty).
+    // Milestone holds are an upgrade, not a requirement. Today is not a
+    // miss until it has passed.
+    const isMissed =
+      !isFuture && !isToday && holdSeconds < challenge.baseSeconds;
     if (!isFuture && !isMissed) {
       plankPoints =
         holdSeconds > 0 ? pointsForHold(challenge, holdSeconds, dayNumber) : 0;
