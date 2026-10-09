@@ -89,7 +89,9 @@ export function SyncCard() {
 
   const codeBlock = (value: string, expiresAt: number) => (
     <div className="mt-2 bg-calm-100 dark:bg-gray-800 rounded-lg p-2">
-      <code className="block text-sm select-all break-all">{value}</code>
+      <code className="block text-sm select-all break-all text-calm-900 dark:text-gray-100">
+        {value}
+      </code>
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
         Valid until {formatTime(expiresAt)}.
       </p>
@@ -111,7 +113,7 @@ export function SyncCard() {
       <div>
         <p className="text-xs text-gray-500 dark:text-gray-400">Account id</p>
         <div className="flex items-center gap-2 mt-1">
-          <code className="text-xs bg-calm-100 dark:bg-gray-800 rounded px-2 py-1 select-all break-all min-w-0">
+          <code className="text-xs bg-calm-100 text-calm-900 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1 select-all break-all min-w-0">
             {accountId}
           </code>
           {linked && role && (
