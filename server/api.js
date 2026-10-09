@@ -406,6 +406,17 @@ export function createApiApp(options = {}) {
     }
   );
 
+  // Malformed JSON / oversized body from express.json: answer JSON, not
+  // the framework's default HTML error page.
+  api.use((err, req, res, next) => {
+    if (err?.type === 'entity.parse.failed' || err?.type === 'entity.too.large') {
+      return res.status(400).json({
+        error: err.type === 'entity.too.large' ? 'request body too large' : 'malformed JSON'
+      });
+    }
+    next(err);
+  });
+
   // Unknown /api paths get a real 404 (and, in production, never the
   // SPA fallback).
   api.use((_, res) => {

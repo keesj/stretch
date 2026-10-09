@@ -403,6 +403,28 @@ describe('token management', () => {
   });
 });
 
+describe('error responses', () => {
+  test('malformed JSON gets a JSON 400, not the default HTML page', async () => {
+    const res = await fetch(`${base}/api/sync/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: '{not json'
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('malformed JSON');
+  });
+
+  test('an oversized body gets a JSON 400', async () => {
+    const res = await fetch(`${base}/api/sync/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: `{"ops": [${'"a'.repeat(2 * 1024 * 1024)}]}`
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('request body too large');
+  });
+});
+
 describe('SPA isolation', () => {
   test('unknown /api paths get a JSON 404, not the app shell', async () => {
     const res = await fetch(`${base}/api/nope`);
