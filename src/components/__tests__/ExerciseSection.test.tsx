@@ -35,11 +35,17 @@ function baseProps(overrides: Partial<Record<string, unknown>> = {}) {
   };
   const props = {
     exercise: makeExercise(),
+    nextExercise: makeExercise({
+      id: 'next-1',
+      title: 'Toe Touch',
+      duration: 30,
+    }),
     index: 0,
     isActive: true,
     isLast: false,
     autoStart: false,
     getClock: () => 0,
+    onNext: vi.fn(),
     ...harness,
     ...overrides,
   };
@@ -108,6 +114,22 @@ describe('ExerciseSection', () => {
     expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('Instructions')).toBeInTheDocument();
+  });
+
+  it('shows an "Up next" card with the next exercise at a glance', () => {
+    setupClock();
+    const { props } = baseProps();
+    render(
+      <MotionConfig reducedMotion="always">
+        <ExerciseSection {...props} />
+      </MotionConfig>
+    );
+    expect(screen.getByText('Up next')).toBeInTheDocument();
+    expect(screen.getByText('Toe Touch')).toBeInTheDocument();
+    expect(screen.getByText('30s')).toBeInTheDocument();
+    // Tapping the card scrolls to the next exercise
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next exercise: Toe Touch' }));
+    expect(props.onNext).toHaveBeenCalledTimes(1);
   });
 
   it('tapping the timer runs a 3-2-1 countdown and then starts', () => {
@@ -209,7 +231,7 @@ describe('ExerciseSection', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 
-  it('shows swipe hints according to position', () => {
+  it('shows position hints and the up-next card according to position', () => {
     const { getClock } = setupClock();
     const { props } = baseProps({ getClock });
     const { rerender } = render(
@@ -218,26 +240,26 @@ describe('ExerciseSection', () => {
       </MotionConfig>
     );
 
-    // First exercise, not last
-    expect(screen.getByText('swipe down')).toBeInTheDocument();
+    // First exercise, not last: up-next card, no swipe-up hint
+    expect(screen.getByText('Up next')).toBeInTheDocument();
     expect(screen.queryByText('swipe up')).not.toBeInTheDocument();
 
-    // A middle exercise
+    // A middle exercise: swipe-up hint appears
     rerender(
       <MotionConfig reducedMotion="always">
         <ExerciseSection {...props} index={1} />
       </MotionConfig>
     );
     expect(screen.getByText('swipe up')).toBeInTheDocument();
-    expect(screen.getByText('swipe down')).toBeInTheDocument();
+    expect(screen.getByText('Up next')).toBeInTheDocument();
 
-    // Last exercise
+    // Last exercise: no up-next card
     rerender(
       <MotionConfig reducedMotion="always">
-        <ExerciseSection {...props} index={8} isLast />
+        <ExerciseSection {...props} index={8} isLast nextExercise={undefined} />
       </MotionConfig>
     );
-    expect(screen.queryByText('swipe down')).not.toBeInTheDocument();
+    expect(screen.queryByText('Up next')).not.toBeInTheDocument();
     expect(screen.getByText('swipe up')).toBeInTheDocument();
   });
 });

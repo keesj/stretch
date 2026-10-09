@@ -91,7 +91,6 @@ vi.mock('../../hooks/useWorkout', async () => {
 });
 
 const SCROLL_HEIGHT = 800;
-const SECTION_FRACTION = 0.85;
 const EXERCISES = 9; // wake-up-workout has nine stretches
 
 function getScrollContainer() {
@@ -113,7 +112,7 @@ function activeSection() {
 async function scrollToSection(n: number) {
   const el = getScrollContainer();
   Object.defineProperty(el, 'clientHeight', { value: SCROLL_HEIGHT, configurable: true });
-  el.scrollTop = n * SCROLL_HEIGHT * SECTION_FRACTION;
+  el.scrollTop = n * SCROLL_HEIGHT;
   act(() => {
     el.dispatchEvent(new Event('scroll'));
   });
@@ -158,13 +157,28 @@ describe('Session (scrollable feed)', () => {
     workoutState.resetFn[0] = vi.fn();
   });
 
-  it('renders the exercise feed with the next exercise already below', () => {
+  it('renders the exercise feed with an "Up next" teaser for the following exercise', () => {
     render(<SessionContainer />);
-    // The wake-up routine bookends with Upward Salute (first and last)
-    expect(screen.getAllByText('Upward Salute')).toHaveLength(2);
-    // No appearing "Next up" card — the next exercise is part of the feed
-    expect(screen.getByText('Toe Touch')).toBeInTheDocument();
-    expect(screen.queryByText('Next up')).not.toBeInTheDocument();
+    // The wake-up routine bookends with Upward Salute (first and last);
+    // the second appearance is doubled by the up-next teaser of day 8
+    expect(screen.getAllByText('Upward Salute')).toHaveLength(3);
+    // The next exercise appears in its own section plus the teaser
+    expect(screen.getAllByText('Toe Touch')).toHaveLength(2);
+    expect(screen.getAllByText('Up next')).toHaveLength(EXERCISES - 1);
+  });
+
+  it('tapping the "Up next" card scrolls to the next exercise', async () => {
+    render(<SessionContainer />);
+    const el = getScrollContainer();
+    Object.defineProperty(el, 'clientHeight', { value: SCROLL_HEIGHT, configurable: true });
+    const scrollToSpy = vi.fn();
+    Object.defineProperty(el, 'scrollTo', { value: scrollToSpy, configurable: true });
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Go to next exercise: Toe Touch' }));
+
+    expect(scrollToSpy).toHaveBeenCalledWith({ top: SCROLL_HEIGHT, behavior: 'smooth' });
   });
 
   it('has no Previous/Next buttons; the feed is scrolled instead', () => {
@@ -174,15 +188,17 @@ describe('Session (scrollable feed)', () => {
     expect(screen.queryByText('Next')).not.toBeInTheDocument();
   });
 
-  it('shows swipe affordances for the active exercise', async () => {
+  it('shows the up-next teaser and swipe-up hint for the active exercise', async () => {
     render(<SessionContainer />);
-    // First exercise: swipe down only
-    expect(screen.getByText('swipe down')).toBeInTheDocument();
+    // First exercise: up-next teaser (Toe Touch), no swipe-up hint
+    expect(sectionEl(0)).toHaveTextContent('Toe Touch');
     expect(screen.queryByText('swipe up')).not.toBeInTheDocument();
 
     await scrollToSection(1);
     expect(screen.getByText('swipe up')).toBeInTheDocument();
     expect(screen.getByText('Exercise 2 of 9')).toBeInTheDocument();
+    // Section 2 teases the following exercise
+    expect(sectionEl(1)).toHaveTextContent('Lunge (Left)');
   });
 
   it('backing out navigates home and resets the workout', async () => {
@@ -268,12 +284,12 @@ describe('Session (scrollable feed)', () => {
     // The completed state shows briefly, then the session scrolls on
     await waitMs(1600);
     expect(scrollToSpy).toHaveBeenCalledWith({
-      top: SCROLL_HEIGHT * SECTION_FRACTION,
+      top: SCROLL_HEIGHT,
       behavior: 'smooth',
     });
 
     // Simulate the scroll settling on exercise 2
-    el.scrollTop = SCROLL_HEIGHT * SECTION_FRACTION;
+    el.scrollTop = SCROLL_HEIGHT;
     act(() => {
       el.dispatchEvent(new Event('scroll'));
     });
@@ -343,10 +359,11 @@ describe('Session (scrollable feed)', () => {
     render(<SessionContainer />);
     await userEvent.setup().click(screen.getByText('Instructions'));
 
-    expect(await screen.findByText('Stand tall with feet hip-width apart')).toBeInTheDocument();
-    expect(screen.getByText('Easy')).toBeInTheDocument();
-    expect(screen.getByText('30s')).toBeInTheDocument();
-    expect(screen.getByText('spine')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Stand tall with feet hip-width apart')).toBeInTheDocument();
+    expect(within(dialog).getByText('Easy')).toBeInTheDocument();
+    expect(within(dialog).getByText('30s')).toBeInTheDocument();
+    expect(within(dialog).getByText('spine')).toBeInTheDocument();
   });
 });
 

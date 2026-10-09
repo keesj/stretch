@@ -25,9 +25,6 @@ const difficultyColors = {
   hard: "text-red-600 dark:text-red-400",
 };
 
-// Each exercise fills 85% of the viewport so the next one peeks in at the
-// bottom — the "next up" card is now always there, one scroll away.
-const SECTION_FRACTION = 0.85;
 // Let the "Completed" state land before scrolling on to the next exercise
 const ADVANCE_DELAY_MS = 1500;
 
@@ -101,9 +98,8 @@ export function Session() {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el || el.clientHeight <= 0) return;
-    const sectionHeight = el.clientHeight * SECTION_FRACTION;
     const index = Math.min(
-      Math.max(Math.round(el.scrollTop / sectionHeight), 0),
+      Math.max(Math.round(el.scrollTop / el.clientHeight), 0),
       totalExercises - 1
     );
     setActiveIndex((prev) => (prev === index ? prev : index));
@@ -112,10 +108,7 @@ export function Session() {
   const scrollToIndex = useCallback((index: number) => {
     const el = scrollRef.current;
     if (!el || el.clientHeight <= 0) return;
-    el.scrollTo({
-      top: index * el.clientHeight * SECTION_FRACTION,
-      behavior: "smooth",
-    });
+    el.scrollTo({ top: index * el.clientHeight, behavior: "smooth" });
   }, []);
 
   const handlePhaseChange = useCallback((index: number, phase: ExercisePhase) => {
@@ -202,13 +195,14 @@ export function Session() {
             // opener and closer), so the index disambiguates the key
             key={`${exercise.id}-${index}`}
             inert={index !== activeIndex}
-            className="h-[85%] snap-start"
+            className="h-full snap-start"
           >
             <ExerciseSection
               exercise={exercise}
               index={index}
               isActive={index === activeIndex}
               isLast={index === totalExercises - 1}
+              nextExercise={exerciseStretches[index + 1]}
               autoStart={pendingAutoStart === index}
               onAutoStartConsumed={handleAutoStartConsumed}
               onCompleted={handleExerciseCompleted}
@@ -216,10 +210,10 @@ export function Session() {
               scheduleBeeps={scheduleBeeps}
               getClock={getClock}
               onShowInstructions={() => setShowInstructions(true)}
+              onNext={() => scrollToIndex(index + 1)}
             />
           </section>
         ))}
-        <div className="h-[15%]" aria-hidden="true" />
       </div>
 
       <AnimatePresence>
@@ -236,6 +230,9 @@ export function Session() {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 16 }}
               transition={{ duration: 0.2 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Exercise instructions"
               className="w-full max-w-sm max-h-[85vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
