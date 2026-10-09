@@ -61,14 +61,21 @@ export function Home() {
         setPlankState(loadPlankState());
       }
     };
+    // Fired after a sync round absorbs remote ops (same tab).
+    const handleDataRefresh = () => {
+      loadSessions();
+      setPlankState(loadPlankState());
+    };
 
     try {
       window.addEventListener("storage", handleStorageChange);
+      window.addEventListener("stretch:data", handleDataRefresh);
     } catch { /* storage events not supported */ }
-    
+
     return () => {
       try {
         window.removeEventListener("storage", handleStorageChange);
+        window.removeEventListener("stretch:data", handleDataRefresh);
       } catch { /* cleanup failed */ }
     };
   }, []);

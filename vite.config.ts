@@ -1,10 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+// @ts-ignore - the server is plain ESM JavaScript, no type declarations
+import { createApiApp } from './server/api.js'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    {
+      // Dev mode only: serve the sync API from the same process as the app,
+      // so `npm run dev` needs no second node process (server.js is only
+      // needed for production / pm2).
+      name: 'stretch-sync-api',
+      configureServer(server) {
+        const { api } = createApiApp()
+        server.middlewares.use('/api', api)
+        // No post hook: the returned function would run at setup, not at
+        // shutdown. The db lives for the lifetime of the dev process.
+      },
+    },
     react(),
     VitePWA({
       // The app is fully client-side (routines, stretches and all progress

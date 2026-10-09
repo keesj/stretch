@@ -55,6 +55,14 @@ export function Challenge() {
 
   const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
 
+  // A sync round that absorbs remote ops rewrites the projection blobs;
+  // pick the new state up without leaving the page.
+  useEffect(() => {
+    const onRefresh = () => setPlankState(loadPlankState());
+    window.addEventListener("stretch:data", onRefresh);
+    return () => window.removeEventListener("stretch:data", onRefresh);
+  }, []);
+
   const cancelCountdown = useCallback(() => {
     if (countdownRafRef.current != null) {
       cancelAnimationFrame(countdownRafRef.current);

@@ -1,4 +1,5 @@
-import { loadFromStorage, saveToStorage } from "./storage";
+import { loadFromStorage } from "./storage";
+import { recordChallengeStart, recordPlankDay } from "../sync/record";
 import { MAX_RECOVERY_DEFICIT } from "../types/challenge";
 import type {
   Challenge,
@@ -68,14 +69,13 @@ export function loadPlankState(): PlankChallengeState {
   return { startedAt: state.startedAt, days };
 }
 
-export function savePlankState(state: PlankChallengeState): void {
-  saveToStorage("plankChallenge", state);
-}
-
+/**
+ * Start the challenge. The state change is journaled (src/sync/record)
+ * so it syncs across devices; the projection blob is rewritten by the
+ * replay, which loadPlankState reads.
+ */
 export function startPlankChallenge(now: Date = new Date()): PlankChallengeState {
-  const state: PlankChallengeState = { startedAt: todayKey(now), days: [] };
-  savePlankState(state);
-  return state;
+  return recordChallengeStart(now);
 }
 
 /** Merge a completed hold into the state, keeping the best hold per day. */
@@ -93,13 +93,16 @@ export function mergePlankDay(
   return { startedAt: state.startedAt ?? date, days };
 }
 
+/**
+ * Record today's hold. Journaled like startPlankChallenge; keeps the best
+ * hold per day (the replay's plankDay merge), so re-completing a day
+ * upgrades it to the stronger hold.
+ */
 export function completePlankDay(
   seconds: number,
   now: Date = new Date()
 ): PlankChallengeState {
-  const next = mergePlankDay(loadPlankState(), todayKey(now), seconds);
-  savePlankState(next);
-  return next;
+  return recordPlankDay(seconds, now);
 }
 
 /** True when the given day number is a milestone day (day 10, 20, ...). */

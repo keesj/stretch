@@ -119,8 +119,15 @@ describe('Settings Page', () => {
     const user = userEvent.setup();
     await user.click(screen.getByText('Reset Progress'));
 
-    expect(localStorage.removeItem).toHaveBeenCalledWith('completedSessions');
-    expect(localStorage.removeItem).toHaveBeenCalledWith('plankChallenge');
+    // Journaled reset: the projection blobs are rewritten to empty state
+    // (a reset op syncs the wipe to the other devices).
+    const setItem = localStorage.setItem as ReturnType<typeof vi.fn>;
+    const sessions = setItem.mock.calls.filter(([key]) => key === 'completedSessions');
+    expect(sessions.length).toBeGreaterThan(0);
+    expect(sessions[sessions.length - 1][1]).toBe(JSON.stringify([]));
+    const plank = setItem.mock.calls.filter(([key]) => key === 'plankChallenge');
+    expect(plank.length).toBeGreaterThan(0);
+    expect(JSON.parse(plank[plank.length - 1][1])).toEqual({ startedAt: null, days: [] });
   });
 
   it('persists the sound preference when the toggle changes', () => {

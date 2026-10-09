@@ -174,8 +174,11 @@ describe('Challenge page', () => {
     // Day 1 done, day 2 missed => deficit 1.5 on day 3, bonus available
     const today = todayKey();
     const day1 = addDays(today, -2);
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(
-      JSON.stringify({ startedAt: day1, days: [{ date: day1, seconds: 120 }] })
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string) =>
+        key === 'plankChallenge'
+          ? JSON.stringify({ startedAt: day1, days: [{ date: day1, seconds: 120 }] })
+          : null
     );
 
     render(<ChallengeContainer />);
@@ -216,8 +219,9 @@ describe('Challenge page', () => {
       date: addDays(today, -(9 - i)),
       seconds: 120,
     }));
-    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(
-      JSON.stringify({ startedAt: day1, days })
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string) =>
+        key === 'plankChallenge' ? JSON.stringify({ startedAt: day1, days }) : null
     );
 
     render(<ChallengeContainer />);

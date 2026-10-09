@@ -1,24 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { Routine } from "../types/routine";
 import type { Stretch } from "../types/stretch";
-import {
-  loadFromStorage,
-  saveToStorage,
-  type CompletedSession,
-} from "../utils/storage";
+import { recordSession } from "../sync/record";
+import { newUuid } from "../utils/uuid";
+import { type CompletedSession } from "../utils/storage";
 
 interface UseWorkoutOptions {
   routine: Routine;
   stretches: Stretch[];
   onComplete?: (session: CompletedSession) => void;
-}
-
-function generateId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  // Fallback for environments without crypto (older Android WebView, etc.)
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions) {
@@ -99,19 +89,16 @@ export function useWorkout({ routine, stretches, onComplete }: UseWorkoutOptions
     setIsCompleted(true);
 
     const completedSession: CompletedSession = {
-      id: generateId(),
+      id: newUuid(),
       routineId: routineRef.current.id,
       routineTitle: routineRef.current.title,
       duration,
       completedAt: new Date().toISOString(),
     };
 
-    const completedSessions = loadFromStorage<CompletedSession[]>(
-      "completedSessions",
-      []
-    );
-    completedSessions.push(completedSession);
-    saveToStorage("completedSessions", completedSessions);
+    // Journaled (src/sync/record): the projection blob is rewritten by
+    // the replay, so no manual completedSessions bookkeeping here.
+    recordSession(completedSession);
 
     if (completeCallbackRef.current) {
       completeCallbackRef.current(completedSession);

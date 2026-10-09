@@ -127,7 +127,7 @@ describe('useWorkout', () => {
 
     const saved = JSON.parse(calls[0][1]);
     expect(saved).toEqual([{
-      id: 'test-uuid-12345',
+      id: expect.any(String),
       routineId: 'test-routine',
       routineTitle: 'Test Routine',
       duration: 9,

@@ -14,11 +14,15 @@
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
+    "better-sqlite3": "^13.0.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
     "framer-motion": "^13.4.2",
+    "helmet": "^8.3.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

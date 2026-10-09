@@ -91,7 +91,7 @@ describe('timer + workout integration (real hooks)', () => {
 
     const session = onComplete.mock.calls[0][0];
     expect(session).toMatchObject({
-      id: 'test-uuid-12345',
+      id: expect.any(String),
       routineId: 'test-routine',
       routineTitle: 'Test Routine',
       duration: expect.any(Number),
