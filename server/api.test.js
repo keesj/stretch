@@ -10,7 +10,6 @@ const BOOTSTRAP_ID = '99999999-8888-4777-8666-555555555555';
 const REVOKE_ID = '55345678-1234-4234-8234-123456789abc';
 const ROTATE_ID = '22345678-1234-4234-8234-123456789abc';
 const SIGNOUT_ID = '12345678-1234-4234-8234-123456789abc';
-const MERGE_SRC_ID = '44345678-1234-4234-8234-123456789abc';
 
 // A sortable hlc carrying a specific wall-clock time (the anti-cheat
 // windows are checked against the hlc's embedded clock).
@@ -167,19 +166,10 @@ describe('/api/sync/push', () => {
     expect(body.error).toContain('future');
   });
 
-  test('rejects a plank day recorded far after its date', async () => {
-    const { status, body } = await post(
-      '/api/sync/push',
-      { ops: [makeOp({ entityId: daysAgoKey(10) })] }
-    );
-    expect(status).toBe(400);
-    expect(body.error).toContain('too long after');
-  });
-
-  test('accepts a plank day recorded within the 48h retro window', async () => {
+  test('accepts a backdated plank day (legacy migration and CLI record old days)', async () => {
     const { status } = await post(
       '/api/sync/push',
-      { ops: [makeOp({ entityId: daysAgoKey(2) })] }
+      { ops: [makeOp({ entityId: daysAgoKey(10) })] }
     );
     expect(status).toBe(200);
   });
@@ -272,7 +262,8 @@ describe('/api/sync/push', () => {
     );
     expect(future.status).toBe(400);
 
-    const stale = await post(
+    // Old sessions are accepted: the legacy migration records them.
+    const old = await post(
       '/api/sync/push',
       {
         ops: [
@@ -284,7 +275,7 @@ describe('/api/sync/push', () => {
         ]
       }
     );
-    expect(stale.status).toBe(400);
+    expect(old.status).toBe(200);
   });
 
   test('settings ops are patches with known fields only', async () => {
@@ -409,71 +400,6 @@ describe('token management', () => {
     expect(status).toBe(200);
     const after = await post('/api/sync/pull', {}, boot.body.token);
     expect(after.status).toBe(401);
-  });
-});
-
-describe('account merge', () => {
-  let sourceToken; // MERGE_SRC_ID (a second, separate account)
-
-  beforeAll(async () => {
-    const boot = await post('/api/sync/bootstrap', { accountId: MERGE_SRC_ID }, null);
-    sourceToken = boot.body.token;
-  });
-
-  test('an owner can mint a merge code for this account', async () => {
-    const { status, body } = await post('/api/sync/merge/mint', {}, sourceToken);
-    expect(status).toBe(200);
-    expect(body.code).toMatch(/^[a-f0-9]{16}$/);
-    expect(typeof body.expiresAt).toBe('number');
-  });
-
-  test('redeeming another account\'s merge code copies its journal in', async () => {
-    // The source account records a plank day and a session.
-    const plank = makeOp({ hlc: hlcFor(Date.now()) });
-    const pushed = await post('/api/sync/push', { ops: [plank] }, sourceToken);
-    expect(pushed.status).toBe(200);
-
-    const mint = await post('/api/sync/merge/mint', {}, sourceToken);
-    const redeem = await post('/api/sync/merge/redeem', { code: mint.body.code });
-    expect(redeem.status).toBe(200);
-    expect(redeem.body).toEqual({ ok: true, source: MERGE_SRC_ID, copied: 1 });
-
-    const pull = await post('/api/sync/pull', {});
-    expect(pull.body.ops.some((o) => o.id === plank.id)).toBe(true);
-  });
-
-  test('a merge code is single-use', async () => {
-    const mint = await post('/api/sync/merge/mint', {}, sourceToken);
-    const first = await post('/api/sync/merge/redeem', { code: mint.body.code });
-    expect(first.status).toBe(200);
-    const second = await post('/api/sync/merge/redeem', { code: mint.body.code });
-    expect(second.status).toBe(400);
-  });
-
-  test('a merge code cannot be redeemed by the account it names', async () => {
-    const mint = await post('/api/sync/merge/mint', {}, sourceToken);
-    const { status, body } = await post(
-      '/api/sync/merge/redeem',
-      { code: mint.body.code },
-      sourceToken
-    );
-    expect(status).toBe(400);
-    expect(body.error).toContain('this account');
-  });
-
-  test('an unknown merge code is rejected', async () => {
-    const { status } = await post('/api/sync/merge/redeem', { code: 'deadbeefdeadbeef' });
-    expect(status).toBe(400);
-  });
-
-  test('re-merging the same account is idempotent', async () => {
-    const mint = await post('/api/sync/merge/mint', {}, sourceToken);
-    const first = await post('/api/sync/merge/redeem', { code: mint.body.code });
-    expect(first.status).toBe(200);
-    const again = await post('/api/sync/merge/mint', {}, sourceToken);
-    const second = await post('/api/sync/merge/redeem', { code: again.body.code });
-    expect(second.status).toBe(200);
-    expect(second.body.copied).toBe(0);
   });
 });
 

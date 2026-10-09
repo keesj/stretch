@@ -4,12 +4,7 @@ import { Button } from "./Button";
 import { useSyncStore } from "../sync/useSyncStore";
 import { useDeviceIdentity } from "../sync/useDeviceIdentity";
 import { joinWith } from "../sync/join";
-import {
-  mintMergeCode,
-  mintPairCode,
-  redeemMergeCode,
-  revokeSelf,
-} from "../sync/syncClient";
+import { mintPairCode, revokeSelf } from "../sync/syncClient";
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString(undefined, {
@@ -19,19 +14,16 @@ function formatTime(ts: number): string {
 }
 
 /**
- * The Sync card: link this device to an account (or create one), link
- * other devices, and merge a separate account in (or out). The plain
- * "Sync now" status line doubles as the offline indicator.
+ * The Sync card: link this device to an account (or create one) and link
+ * other devices. The "Sync now" status line doubles as the offline
+ * indicator.
  */
 export function SyncCard() {
   const { lastSyncAt, lastError, syncing, syncNow } = useSyncStore();
   const { accountId, linked, role, refresh, detach, rotate } = useDeviceIdentity();
 
   const [pairCode, setPairCode] = useState<{ code: string; expiresAt: number } | null>(null);
-  const [mergeOutCode, setMergeOutCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [joinInput, setJoinInput] = useState("");
-  const [mergeInInput, setMergeInInput] = useState("");
-  const [mergedMessage, setMergedMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -60,7 +52,6 @@ export function SyncCard() {
     run(async () => {
       const code = await mintPairCode();
       setPairCode(code);
-      setMergeOutCode(null);
     });
 
   const join = () =>
@@ -69,26 +60,6 @@ export function SyncCard() {
       refresh();
       setJoinInput("");
       await syncNow();
-    });
-
-  const mergeOut = () =>
-    run(async () => {
-      const code = await mintMergeCode();
-      setMergeOutCode(code);
-      setPairCode(null);
-    });
-
-  const mergeIn = () =>
-    run(async () => {
-      const { copied } = await redeemMergeCode(mergeInInput.trim());
-      setMergeInInput("");
-      setMergeOutCode(null);
-      await syncNow();
-      setMergedMessage(
-        copied > 0
-          ? `Merged ${copied} record${copied === 1 ? "" : "s"} from the other account.`
-          : "The other account had no new records to merge."
-      );
     });
 
   const signOut = () =>
@@ -113,9 +84,8 @@ export function SyncCard() {
       ) {
         return;
       }
-      rotate();
-      setMergedMessage(null);
-    });
+       rotate();
+     });
 
   const codeBlock = (value: string, expiresAt: number) => (
     <div className="mt-2 bg-calm-100 dark:bg-gray-800 rounded-lg p-2">
@@ -156,14 +126,9 @@ export function SyncCard() {
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Devices</p>
         {linked ? (
           <div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={linkDevice} disabled={busy || role !== "owner"}>
-                Link a device
-              </Button>
-              <Button variant="secondary" onClick={mergeOut} disabled={busy || role !== "owner"}>
-                Get merge code
-              </Button>
-            </div>
+            <Button variant="secondary" onClick={linkDevice} disabled={busy || role !== "owner"}>
+              Link a device
+            </Button>
             {role !== "owner" && (
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                 Ask the owner device to create the code.
@@ -174,15 +139,6 @@ export function SyncCard() {
                 {codeBlock(pairCode.code, pairCode.expiresAt)}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   On the other device: Settings → Sync → paste the code and Join.
-                </p>
-              </>
-            )}
-            {mergeOutCode && (
-              <>
-                {codeBlock(mergeOutCode.code, mergeOutCode.expiresAt)}
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  On the account to merge INTO: Settings → Sync → “Merge another account” → paste
-                  this code. That account takes a copy of this account’s records.
                 </p>
               </>
             )}
@@ -203,39 +159,6 @@ export function SyncCard() {
               Join
             </Button>
           </div>
-        )}
-      </div>
-
-      <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3">
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          Merge another account
-        </p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-          Copy records from a separate account (e.g. a replacement phone that kept its own
-          history) into this account.
-        </p>
-        <div className="flex items-center gap-2">
-          <input
-            value={mergeInInput}
-            onChange={(e) => {
-              setMergeInInput(e.target.value);
-              setError(null);
-            }}
-            placeholder="Merge code from the other device"
-            aria-label="Merge code from the other device"
-            className="input flex-1 min-w-0 py-1.5 px-2 text-sm"
-          />
-          <Button
-            variant="secondary"
-            onClick={mergeIn}
-            disabled={busy || !mergeInInput.trim() || role !== "owner"}
-            className="shrink-0"
-          >
-            Merge in
-          </Button>
-        </div>
-        {mergedMessage && (
-          <p className="text-xs text-primary-600 dark:text-primary-400 mt-2">{mergedMessage}</p>
         )}
       </div>
 

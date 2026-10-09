@@ -8,14 +8,13 @@ const TOKEN_KEY = "stretch.token";
 const ROLE_KEY = "stretch.role";
 const DEVICE_ID_KEY = "stretch.deviceId";
 
-// 16 hex chars, as minted by the server's pairing/merge flow.
+// 16 hex chars, as minted by the server's pairing flow.
 export const PAIR_CODE_RE = /^[a-f0-9]{16}$/i;
 
 /**
  * The token's privilege class: the owner is the first device (links new
- * devices, merges accounts, revokes the others), a secondary is a regular
- * linked device. The server enforces the role; this copy only drives local
- * behavior.
+ * devices, revokes the others), a secondary is a regular linked device.
+ * The server enforces the role; this copy only drives local behavior.
  */
 export type SyncRole = "owner" | "secondary";
 export const SYNC_ROLES: readonly SyncRole[] = ["owner", "secondary"];

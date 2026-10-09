@@ -18,20 +18,14 @@ import Database from 'better-sqlite3';
  *   account id itself is never a credential.
  *
  *   role is the token's privilege class:
- *     owner     - the first device; may also link new devices, merge
- *                 accounts, and revoke the others
- *     secondary - a regular linked device; syncs but cannot link/merge/revoke
+ *     owner     - the first device; may also link new devices and revoke
+ *                 the others
+ *     secondary - a regular linked device; syncs but cannot link or revoke
  *   Roles are minted, never escalated: bootstrap -> owner, a pairing code
  *   carries the role it was minted with, reissue preserves it.
  *
  *   pair_codes(code PK, user_id, role, created_at, expires_at, redeemed_at)
  *   One-time, short-lived codes that let a new device mint a token.
- *
- *   merge_codes(code PK, user_id, created_at, expires_at, redeemed_at)
- *   One-time, short-lived codes that let the code's account (the source)
- *   have its journal copied into another account (the redeemer's). This is
- *   the "merge two accounts" path for e.g. a replacement phone that ran as
- *   its own account before being folded back into the original one.
  *
  * hlc is a fixed-width sortable string, so plain lexicographic comparison
  * gives the same total order as the client's compareHlc.
@@ -73,13 +67,6 @@ export function createSyncDb(dbPath, options = {}) {
       code        TEXT PRIMARY KEY,
       user_id     TEXT NOT NULL,
       role        TEXT    NOT NULL DEFAULT 'secondary',
-      created_at  INTEGER NOT NULL,
-      expires_at  INTEGER NOT NULL,
-      redeemed_at INTEGER
-    );
-    CREATE TABLE IF NOT EXISTS merge_codes (
-      code        TEXT PRIMARY KEY,
-      user_id     TEXT NOT NULL,
       created_at  INTEGER NOT NULL,
       expires_at  INTEGER NOT NULL,
       redeemed_at INTEGER
@@ -159,30 +146,6 @@ export function createSyncDb(dbPath, options = {}) {
     })();
   };
 
-  // --- one-time account merge codes ----------------------------------
-
-  const mintMergeCode = (userId) => {
-    const code = crypto.randomBytes(8).toString('hex');
-    const now = Date.now();
-    db.prepare(
-      'INSERT INTO merge_codes (code, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)'
-    ).run(code, userId, now, now + CODE_TTL_MS);
-    return { code, expiresAt: now + CODE_TTL_MS };
-  };
-
-  // Single-use and time-boxed. Returns the source account id (whose
-  // journal will be copied), or null when the code is unknown, already
-  // used, or expired.
-  const redeemMergeCode = (code) => {
-    return db.transaction(() => {
-      db.prepare('DELETE FROM merge_codes WHERE expires_at < ?').run(Date.now());
-      const row = db.prepare('SELECT * FROM merge_codes WHERE code = ?').get(code);
-      if (!row || row.redeemed_at !== null || row.expires_at < Date.now()) return null;
-      db.prepare('UPDATE merge_codes SET redeemed_at = ? WHERE code = ?').run(Date.now(), code);
-      return row.user_id;
-    })();
-  };
-
   const insertOp = db.prepare(`
     INSERT OR IGNORE INTO ops
       (op_id, user_id, hlc, device, entity, entity_id, kind, data, created_at)
@@ -238,27 +201,23 @@ export function createSyncDb(dbPath, options = {}) {
     }));
   };
 
-  // Copy the source account's whole journal into the target account's.
-  // Idempotent: ops already present (same op_id) are ignored. Returns the
-  // number of ops newly added. Used by the account-merge endpoint.
-  const copyJournal = db.transaction((fromUserId, toUserId) => {
-    const result = db
+  // Every account that has a token or any journal data (for the CLI's
+  // `accounts` command).
+  const accountIds = () =>
+    db
       .prepare(
-        `INSERT OR IGNORE INTO ops
-           (op_id, user_id, hlc, device, entity, entity_id, kind, data, created_at)
-         SELECT op_id, ?, hlc, device, entity, entity_id, kind, data, ?
-         FROM ops WHERE user_id = ?`
+        'SELECT DISTINCT user_id FROM tokens ' +
+          'UNION SELECT DISTINCT user_id FROM ops ORDER BY user_id'
       )
-      .run(toUserId, Date.now(), fromUserId);
-    return result.changes;
-  });
+      .all()
+      .map((row) => row.user_id);
 
   return {
     push: (userId, ops) => pushMany(userId, ops),
     pull,
     opCount: (userId) =>
       db.prepare('SELECT COUNT(*) AS n FROM ops WHERE user_id = ?').get(userId).n,
-    copyJournal,
+    accountIds,
     mintToken,
     findAccountByToken,
     touchToken: (token) => touchToken.run(Date.now(), token),
@@ -268,8 +227,6 @@ export function createSyncDb(dbPath, options = {}) {
     listTokens,
     mintPairCode,
     redeemPairCode,
-    mintMergeCode,
-    redeemMergeCode,
     close: () => db.close()
   };
 }

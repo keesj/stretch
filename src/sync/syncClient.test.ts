@@ -5,8 +5,6 @@ import {
   mintPairCode,
   redeemPairCode,
   bootstrap,
-  mintMergeCode,
-  redeemMergeCode,
   revokeSelf,
   SyncError,
 } from "./syncClient";
@@ -93,7 +91,7 @@ describe("pullOps", () => {
   });
 });
 
-describe("pairing and merge clients", () => {
+describe("pairing and token clients", () => {
   test("mintPairCode posts to /api/sync/pair", async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { code: "abcdef0123456789", expiresAt: 5 }));
     await expect(mintPairCode("phone")).resolves.toEqual({
@@ -127,22 +125,6 @@ describe("pairing and merge clients", () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/sync/bootstrap");
     expect(JSON.parse(init.body as string)).toEqual({ accountId: "some-account", label: "phone" });
-  });
-
-  test("merge clients hit the merge endpoints", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { code: "abcdef0123456789", expiresAt: 5 }));
-    await mintMergeCode();
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/sync/merge/mint");
-
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, source: "b", copied: 2 }));
-    await expect(redeemMergeCode("abcdef0123456789")).resolves.toEqual({
-      ok: true,
-      source: "b",
-      copied: 2,
-    });
-    const [url, init] = vi.mocked(fetch).mock.calls[1] as [string, RequestInit];
-    expect(url).toBe("/api/sync/merge/redeem");
-    expect(JSON.parse(init.body as string)).toEqual({ code: "abcdef0123456789" });
   });
 
   test("revokeSelf hits /api/sync/token/revoke-self", async () => {

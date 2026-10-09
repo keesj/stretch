@@ -45,6 +45,15 @@ function encode(ms: number, counter: number, device: string): string {
 }
 
 /**
+ * An hlc for a known (past) time instead of "now" — used by the legacy
+ * migration so migrated ops sort at the moment the data actually
+ * happened, ahead of everything recorded after the upgrade.
+ */
+export function hlcAt(ms: number, device: string, counter = 0): string {
+  return encode(ms, counter, device);
+}
+
+/**
  * The next local clock value: at least the wall clock, and strictly after
  * `lastHlc` (the highest clock this device has seen, local or remote).
  */

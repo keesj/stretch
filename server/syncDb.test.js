@@ -134,13 +134,6 @@ describe('syncDb tokens', () => {
     short.close();
   });
 
-  test('an expired merge code cannot be redeemed', () => {
-    const short = createSyncDb(path.join(dir, 'short-ttl-merge.sqlite'), { codeTtlMs: -1000 });
-    const { code } = short.mintMergeCode('user-1');
-    expect(short.redeemMergeCode(code)).toBeNull();
-    short.close();
-  });
-
   test('revoking a token hides it from lookups', () => {
     const token = db.mintToken('user-1', '', 'secondary');
     expect(db.revokeToken(token)).toBe(true);
@@ -180,29 +173,14 @@ describe('syncDb tokens', () => {
   });
 });
 
-describe('syncDb merge codes', () => {
-  test('a merge code is single-use and names the source account', () => {
-    const { code } = db.mintMergeCode('user-b');
-    expect(db.redeemMergeCode(code)).toBe('user-b');
-    expect(db.redeemMergeCode(code)).toBeNull();
+describe('syncDb accountIds', () => {
+  test('unions accounts from tokens and ops', () => {
+    db.mintToken('user-b', '', 'owner');
+    db.push('user-a', [makeOp()]);
+    expect(db.accountIds()).toEqual(['user-a', 'user-b']);
   });
 
-  test('an unknown merge code is rejected', () => {
-    expect(db.redeemMergeCode('deadbeefdeadbeef')).toBeNull();
-  });
-
-  test('copyJournal copies ops across accounts, idempotently', () => {
-    db.push('user-b', [makeOp(), makeOp({ entityId: '2026-10-02' })]);
-    expect(db.copyJournal('user-b', 'user-a')).toBe(2);
-    expect(db.opCount('user-a')).toBe(2);
-    // Re-merge: nothing new.
-    expect(db.copyJournal('user-b', 'user-a')).toBe(0);
-    // The source keeps its own journal.
-    expect(db.opCount('user-b')).toBe(2);
-    // An op already present in the target is not double-counted.
-    db.push('user-a', [makeOp({ entityId: '2026-10-03' })]);
-    db.push('user-b', [makeOp({ entityId: '2026-10-04' })]);
-    expect(db.copyJournal('user-b', 'user-a')).toBe(1);
-    expect(db.opCount('user-a')).toBe(4);
+  test('is empty on a fresh db', () => {
+    expect(db.accountIds()).toEqual([]);
   });
 });

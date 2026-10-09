@@ -5,7 +5,7 @@ import os from 'os';
 import path from 'path';
 import { createSyncDb } from './syncDb.js';
 
-const USER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const USER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HLC_RE = /^[0-9a-z]{19}$/;
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
 const PAIR_CODE_RE = /^[a-f0-9]{16}$/i;
@@ -14,16 +14,16 @@ const ENTITIES = new Set(['plankDay', 'challenge', 'session', 'settings', 'reset
 const KINDS = new Set(['create', 'patch']);
 const MAX_PUSH_OPS = 1000;
 
-// Anti-cheat limits. The app itself only ever records what the timer
-// actually ran, so these bounds are generous for honest use and just
-// enough to stop fabricated data (inflated holds, future dates, bulk
-// backfill) from entering the shared journal.
+// Validation limits. The app itself only ever records what the timer
+// actually ran, so these bounds are generous for honest use and stop
+// fabricated data (inflated holds, future dates) from entering the
+// shared journal. Backdated records are deliberately allowed: the
+// one-time legacy migration (src/sync/migrate.ts) and the admin CLI
+// (server/cli.js) legitimately record old days, so there is no retro
+// window. What is still refused: future dates, impossible dates,
+// out-of-range durations, and a plank hlc older than the day itself.
 const PLANK_SECONDS_MAX = 3600; // one hour of plank is already a world record
 const SESSION_DURATION_MAX = 4 * 60 * 60; // 4 hours of stretching
-// A plank day / session may be recorded up to this long after the fact
-// (offline phone, late sync). It may never be recorded before it
-// happened (beyond a small clock-skew allowance) or in the future.
-const RECORD_RETRO_MS = 48 * 60 * 60 * 1000;
 const CLOCK_SKEW_MS = 60 * 60 * 1000;
 const COMPLETED_AT_FUTURE_MS = 5 * 60 * 1000;
 
@@ -74,7 +74,7 @@ function hlcMs(hlc) {
 // real calendar date (Feb 30 etc.) or older than the app could exist.
 // Existence is checked with a noon round-trip (midnight can skip an hour
 // on DST transitions, which would make the date "disappear").
-function dateStartMs(key) {
+export function dateStartMs(key) {
   if (!DATE_RE.test(key)) return null;
   const [y, m, d] = key.split('-').map(Number);
   if (m < 1 || m > 12 || d < 1 || y < 2020) return null;
@@ -108,12 +108,7 @@ export function validateStretchOp(op, nowMs = Date.now()) {
       return `plankDay seconds must be an integer between 1 and ${PLANK_SECONDS_MAX}`;
     }
     const start = dateStartMs(op.entityId);
-    // The window is measured from the END of the day (DST shifts it by an
-    // hour at most, which the skew allowance absorbs): a hold on day D
-    // synced at any point on D+2 is still legitimate.
-    const end = start + 86400000;
     if (hlcMs(op.hlc) < start - CLOCK_SKEW_MS) return 'plankDay was recorded before its date';
-    if (hlcMs(op.hlc) > end + RECORD_RETRO_MS + CLOCK_SKEW_MS) return 'plankDay was recorded too long after its date';
     return null;
   }
 
@@ -144,7 +139,6 @@ export function validateStretchOp(op, nowMs = Date.now()) {
     }
     const completed = Date.parse(op.data.completedAt);
     if (completed > nowMs + COMPLETED_AT_FUTURE_MS) return 'session completedAt is in the future';
-    if (completed < nowMs - RECORD_RETRO_MS) return 'session completedAt is too long ago';
     return null;
   }
 
@@ -233,8 +227,8 @@ function buildLimiter({ windowMs, limit }, keyGenerator, what) {
  * journal but is never a credential.
  *
  * Tokens carry a role: the bootstrap mint is `owner` (may also link
- * devices, merge accounts, and revoke others); pairing codes mint
- * `secondary` (full device).
+ * devices and revoke others); pairing codes mint `secondary` (full
+ * device).
  *
  * `rateLimit` is `true`/`undefined` for production defaults, `false` for
  * tests, or a partial `{ unauth, auth, health }` override for tests that
@@ -409,39 +403,6 @@ export function createApiApp(options = {}) {
     (req, res) => {
       db.revokeToken(req.token);
       res.json({ ok: true });
-    }
-  );
-
-  // Mint a one-time code that lets THIS account's journal be copied into
-  // another account. Owner-only. The code names the source; the target
-  // redeems it (below), so the merge always flows source -> redeemer.
-  api.post(
-    '/sync/merge/mint',
-    requireAuth,
-    (req, res, next) => (limited ? authLimiter(req, res, next) : next()),
-    (req, res) => {
-      if (req.role !== 'owner') return forbidden(res, 'only the account owner can merge accounts');
-      res.json(db.mintMergeCode(req.userId));
-    }
-  );
-
-  // Copy the source account's journal into this account's. Owner-only on
-  // the target: merging foreign data in is a big deal, and only the
-  // owner does big deals. Idempotent — re-merging adds nothing.
-  api.post(
-    '/sync/merge/redeem',
-    requireAuth,
-    (req, res, next) => (limited ? authLimiter(req, res, next) : next()),
-    (req, res) => {
-      if (req.role !== 'owner') return forbidden(res, 'only the account owner can merge accounts');
-      const { code } = req.body ?? {};
-      if (!PAIR_CODE_RE.test(code ?? '')) return badRequest(res, 'invalid code');
-      const source = db.redeemMergeCode(code);
-      if (!source) return badRequest(res, 'invalid or expired code');
-      if (source === req.userId) return badRequest(res, 'that code belongs to this account');
-      const copied = db.copyJournal(source, req.userId);
-      console.warn(`[sync] account ${source} merged into ${req.userId} (${copied} ops)`);
-      res.json({ ok: true, source, copied });
     }
   );
 

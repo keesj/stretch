@@ -58,10 +58,11 @@ function isPlausibleOp(v: unknown): v is Op {
 
 /**
  * The legacy base: progress from before the sync build, frozen once. It
- * is the base layer of the replay and is never pushed to the server —
- * it stays on this device forever (a reset op still clears it in the
- * projected state). Returns the live legacy base so callers can use it
- * without a second store read.
+ * is the base layer of the local replay; on the first sync round
+ * migrateLegacyIfNeeded (migrate.ts) also turns it into journal ops so
+ * the history reaches the server and every other device. A reset op
+ * still clears it in the projected state. Returns the live legacy base
+ * so callers can use it without a second store read.
  */
 export function freezeLegacyIfNeeded(): LegacyBase {
   if (safeGet(MIGRATED_KEY) != null) return readLegacy();

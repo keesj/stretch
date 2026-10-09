@@ -137,28 +137,3 @@ export function revokeOtherTokens(baseUrl = ""): Promise<{ ok: boolean; revoked:
 export function revokeSelf(baseUrl = ""): Promise<{ ok: boolean }> {
   return post<{ ok: boolean }>("/api/sync/token/revoke-self", {}, { baseUrl });
 }
-
-/**
- * Mint a one-time code (5-minute TTL) that lets THIS account's journal be
- * copied into another account. Owner-only on the server.
- */
-export function mintMergeCode(
-  baseUrl = ""
-): Promise<{ code: string; expiresAt: number }> {
-  return post<{ code: string; expiresAt: number }>("/api/sync/merge/mint", {}, { baseUrl });
-}
-
-/**
- * Copy another account's journal into this account's, using a merge code
- * minted on that other account. Owner-only on the server.
- */
-export function redeemMergeCode(
-  code: string,
-  baseUrl = ""
-): Promise<{ ok: boolean; source: string; copied: number }> {
-  return post<{ ok: boolean; source: string; copied: number }>(
-    "/api/sync/merge/redeem",
-    { code },
-    { baseUrl }
-  );
-}

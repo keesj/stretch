@@ -10,6 +10,7 @@ import {
   setToken,
 } from "./identity";
 import { appendOps, freezeLegacyIfNeeded, loadJournal, projectWith, quarantineOps } from "./journal";
+import { migrateLegacyIfNeeded } from "./migrate";
 import type { Op } from "./types";
 import { useDeviceIdentity } from "./useDeviceIdentity";
 
@@ -82,9 +83,10 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   syncNow: async () => {
     if (get().syncing) return;
     set({ syncing: true });
-    try {
-      freezeLegacyIfNeeded();
-      let journal = loadJournal();
+      try {
+        freezeLegacyIfNeeded();
+        migrateLegacyIfNeeded();
+        let journal = loadJournal();
       try {
         await ensureToken();
         await syncRound(journal);
