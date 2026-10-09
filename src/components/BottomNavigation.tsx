@@ -1,31 +1,44 @@
+import type { ComponentType, SVGProps } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { HomeIcon, ProgressIcon, SettingsIcon } from "./icons";
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+}
+
+// No "Session" tab: /session is the fullscreen workout flow, entered from
+// the routine cards on Home. It hides this bar itself, so a nav item for
+// it is a dead end (and landing on it without a chosen routine would
+// just start the first one).
+const navItems: NavItem[] = [
+  { to: "/", label: "Home", icon: HomeIcon },
+  { to: "/progress", label: "Progress", icon: ProgressIcon },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
+];
 
 export function BottomNavigation() {
   const location = useLocation();
-
-  const navItems = [
-    { to: "/", label: "Home", icon: "🏠" },
-    { to: "/session", label: "Session", icon: "⏱️" },
-    { to: "/progress", label: "Progress", icon: "📈" },
-    { to: "/settings", label: "Settings", icon: "⚙️" },
-  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2">
       <div className="flex justify-around items-center max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.to;
+          const Icon = item.icon;
           return (
             <Link
               key={item.to}
               to={item.to}
-              className={`flex flex-col items-center p-2 min-h-[44px] min-w-[60px] ${
+              aria-current={isActive ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 p-2 min-h-[44px] min-w-[60px] ${
                 isActive
                   ? "text-primary-600 dark:text-primary-400"
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
-              <span className="text-2xl mb-1">{item.icon}</span>
+              <Icon className="h-[22px] w-[22px]" />
               <span className="text-xs font-medium">{item.label}</span>
             </Link>
           );

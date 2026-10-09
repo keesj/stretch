@@ -6,6 +6,7 @@ import type { Stretch } from "../types/stretch";
 import { RoutineCard } from "../components/RoutineCard";
 import { ChallengeCard } from "../components/ChallengeCard";
 import { Card } from "../components/Card";
+import { SettingsIcon } from "../components/icons";
 import { Button } from "../components/Button";
 import {
   loadFromStorage,
@@ -245,8 +246,9 @@ export function Home() {
         className="mt-8 text-center"
       >
         <Link to="/settings">
-          <Button variant="outline" className="text-sm">
-            ⚙️ Settings
+          <Button variant="outline" className="text-sm gap-2">
+            <SettingsIcon className="h-4 w-4" />
+            Settings
           </Button>
         </Link>
       </motion.div>

@@ -14,105 +14,74 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 import { useLocation } from 'react-router-dom';
 
-describe('BottomNavigation', () => {
-  it('renders all navigation items', () => {
-    vi.mocked(useLocation).mockReturnValue({
-      pathname: '/',
-      search: '',
-      hash: '',
-      state: null,
-      key: 'default',
-    });
+function at(pathname: string) {
+  vi.mocked(useLocation).mockReturnValue({
+    pathname,
+    search: '',
+    hash: '',
+    state: null,
+    key: 'default',
+  });
+}
 
-    render(
-      <MemoryRouter>
-        <BottomNavigation />
-      </MemoryRouter>
-    );
+function renderNav() {
+  return render(
+    <MemoryRouter>
+      <BottomNavigation />
+    </MemoryRouter>
+  );
+}
+
+describe('BottomNavigation', () => {
+  it('renders the navigation items', () => {
+    at('/');
+    renderNav();
 
     expect(screen.getByText('Home')).toBeInTheDocument();
-    expect(screen.getByText('Session')).toBeInTheDocument();
+    expect(screen.getByText('Progress')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
+  it('has no Session tab (the workout flow is entered from Home)', () => {
+    at('/');
+    renderNav();
+    expect(screen.queryByText('Session')).not.toBeInTheDocument();
+  });
+
   it('marks the current route as active', () => {
-    vi.mocked(useLocation).mockReturnValue({
-      pathname: '/session',
-      search: '',
-      hash: '',
-      state: null,
-      key: 'default',
-    });
+    at('/progress');
+    renderNav();
 
-    render(
-      <MemoryRouter>
-        <BottomNavigation />
-      </MemoryRouter>
-    );
-
-    const sessionLink = screen.getByText('Session').closest('a');
-    expect(sessionLink).toHaveClass('text-primary-600');
-    expect(sessionLink).toHaveClass('dark:text-primary-400');
+    const progressLink = screen.getByText('Progress').closest('a');
+    expect(progressLink).toHaveClass('text-primary-600');
+    expect(progressLink).toHaveClass('dark:text-primary-400');
+    expect(progressLink).toHaveAttribute('aria-current', 'page');
 
     const homeLink = screen.getByText('Home').closest('a');
     expect(homeLink).not.toHaveClass('text-primary-600');
+    expect(homeLink).not.toHaveAttribute('aria-current');
   });
 
   it('highlights home when on home route', () => {
-    vi.mocked(useLocation).mockReturnValue({
-      pathname: '/',
-      search: '',
-      hash: '',
-      state: null,
-      key: 'default',
-    });
-
-    render(
-      <MemoryRouter>
-        <BottomNavigation />
-      </MemoryRouter>
-    );
-
-    const homeLink = screen.getByText('Home').closest('a');
-    expect(homeLink).toHaveClass('text-primary-600');
+    at('/');
+    renderNav();
+    expect(screen.getByText('Home').closest('a')).toHaveClass('text-primary-600');
   });
 
   it('highlights settings when on settings route', () => {
-    vi.mocked(useLocation).mockReturnValue({
-      pathname: '/settings',
-      search: '',
-      hash: '',
-      state: null,
-      key: 'default',
-    });
-
-    render(
-      <MemoryRouter>
-        <BottomNavigation />
-      </MemoryRouter>
-    );
-
-    const settingsLink = screen.getByText('Settings').closest('a');
-    expect(settingsLink).toHaveClass('text-primary-600');
+    at('/settings');
+    renderNav();
+    expect(screen.getByText('Settings').closest('a')).toHaveClass('text-primary-600');
   });
 
-  it('renders icons for each navigation item', () => {
-    vi.mocked(useLocation).mockReturnValue({
-      pathname: '/',
-      search: '',
-      hash: '',
-      state: null,
-      key: 'default',
-    });
-
-    render(
-      <MemoryRouter>
-        <BottomNavigation />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByText('🏠')).toBeInTheDocument();
-    expect(screen.getByText('⏱️')).toBeInTheDocument();
-    expect(screen.getByText('⚙️')).toBeInTheDocument();
+  it('renders one line-art icon per navigation item', () => {
+    at('/');
+    const { container } = renderNav();
+    const icons = container.querySelectorAll('a svg');
+    expect(icons).toHaveLength(3);
+    for (const icon of icons) {
+      expect(icon).toHaveAttribute('stroke', 'currentColor');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    }
   });
 });
