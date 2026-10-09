@@ -41,7 +41,6 @@ describe('Home Page', () => {
     render(<MemoryRouter><Home /></MemoryRouter>);
     expect(screen.getByText('Featured')).toBeInTheDocument();
     expect(screen.getByText('All Routines')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
   });
 
   it('renders a Start button for every routine and the challenge', () => {

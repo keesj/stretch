@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import type { Routine } from "../types/routine";
 import type { Stretch } from "../types/stretch";
 import { RoutineCard } from "../components/RoutineCard";
 import { ChallengeCard } from "../components/ChallengeCard";
 import { Card } from "../components/Card";
-import { SettingsIcon } from "../components/icons";
-import { Button } from "../components/Button";
 import {
   loadFromStorage,
   saveToStorage,
@@ -238,20 +236,6 @@ export function Home() {
           ))}
         </div>
       </section>
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="mt-8 text-center"
-      >
-        <Link to="/settings">
-          <Button variant="outline" className="text-sm gap-2">
-            <SettingsIcon className="h-4 w-4" />
-            Settings
-          </Button>
-        </Link>
-      </motion.div>
     </motion.div>
   );
 }

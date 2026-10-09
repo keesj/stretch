@@ -167,12 +167,9 @@ export function Session() {
       className="mx-auto flex h-[100dvh] max-w-md flex-col"
     >
       <div className="flex items-center gap-4 px-4 py-3">
-        <button
-          onClick={handleReturnHome}
-          className="shrink-0 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-        >
+        <Button variant="secondary" onClick={handleReturnHome} className="shrink-0">
           ← Back
-        </button>
+        </Button>
         <div className="relative flex-1">
           <ProgressBar current={activeIndex + 1} total={totalExercises} />
           <span className="absolute inset-0 flex items-center justify-center">
