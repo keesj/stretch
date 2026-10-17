@@ -1,7 +1,7 @@
 import React from "react";
 
 interface CardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   onClick?: () => void;
 }

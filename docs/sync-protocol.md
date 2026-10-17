@@ -100,8 +100,9 @@ Notes:
 
 ## Multiple challenges
 
-Challenges are configured in `src/data/challenges.json` (client-side; the
-server only mirrors the allowed sync ids). The config currently holds two
+Challenges are configured in `src/data/challenges.json`; the server derives
+the allowed sync ids from the same file (`server/challenges.ts`), so adding
+a challenge is a single-file change. The config currently holds two
 cohort challenges that form a hand-over: `plank-30-day` (`syncId: "plank"`,
 threshold scoring, opens 2026-09-26 and runs to 2026-10-25) and
 `plank-max-30-day` (`syncId: "plank-max"`, duration scoring, opens
@@ -149,7 +150,7 @@ threshold scoring, opens 2026-09-26 and runs to 2026-10-25) and
   to it, so the data stays on the device and in the journal. To carry that
   history into another challenge (so it still counts toward totals,
   trophies, and standings), copy the days with the admin CLI:
-  `node server/cli.js migrate-planks <account | --all>` (see `docs/cli.md`).
+  `node server/cli.ts migrate-planks <account | --all>` (see `docs/cli.md`).
 
 ## Social layer: identity and the quiet-day reveal
 
@@ -171,7 +172,7 @@ on the same ops. Two rules keep it honest and friendly:
 
 **Squads** scope the social layer. A squad is a named group of accounts
 stored in plain server tables (`squads` + `squad_members`) and managed
-**only** from the admin CLI (`node server/cli.js squads …`) — there is no
+**only** from the admin CLI (`node server/cli.ts squads …`) — there is no
 squad op, so nothing about group membership is synced, conflicted, or
 visible in a journal. The standings feed is restricted to the requested
 squad's members, and a non-member gets a 403; `GET /api/social/squads`
@@ -298,7 +299,7 @@ sync round, `migrate.ts` converts that frozen base into real journal ops:
 
 ## Server
 
-`server/syncDb.js` + `server/api.js`. SQLite (WAL), layout:
+`server/syncDb.ts` + `server/api.ts`. SQLite (WAL), layout:
 
 ```
 ops(user_id, op_id, hlc, device, entity, entity_id, kind, data, created_at)

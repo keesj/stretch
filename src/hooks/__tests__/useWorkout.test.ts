@@ -1,15 +1,17 @@
 import { renderHook, act } from '@testing-library/react';
 import { useWorkout } from '../useWorkout';
+import type { Routine } from '../../types/routine';
+import type { Stretch } from '../../types/stretch';
 
 describe('useWorkout', () => {
-  const mockRoutine = {
+  const mockRoutine: Routine = {
     id: 'test-routine',
     title: 'Test Routine',
     description: 'Test',
     stretches: ['stretch1', 'stretch2', 'stretch3'],
   };
 
-  const mockStretches = [
+  const mockStretches: Stretch[] = [
     { id: 'stretch1', title: 'Stretch 1', duration: 30, instructions: [], bodyParts: [], difficulty: 'easy', illustration: '🧘' },
     { id: 'stretch2', title: 'Stretch 2', duration: 30, instructions: [], bodyParts: [], difficulty: 'easy', illustration: '🧘' },
     { id: 'stretch3', title: 'Stretch 3', duration: 30, instructions: [], bodyParts: [], difficulty: 'easy', illustration: '🧘' },

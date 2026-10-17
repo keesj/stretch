@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { MotionConfig } from 'framer-motion';
-import { ExerciseSection } from '../ExerciseSection';
+import { ExerciseSection, type ExerciseSectionProps } from '../ExerciseSection';
 import type { Stretch } from '../../types/stretch';
 
 function makeExercise(overrides: Partial<Stretch> = {}): Stretch {
@@ -18,14 +18,14 @@ function makeExercise(overrides: Partial<Stretch> = {}): Stretch {
 }
 
 interface Harness {
-  onCompleted: ReturnType<typeof vi.fn>;
-  onPhaseChange: ReturnType<typeof vi.fn>;
-  onAutoStartConsumed: ReturnType<typeof vi.fn>;
-  scheduleBeeps: ReturnType<typeof vi.fn>;
-  onShowInstructions: ReturnType<typeof vi.fn>;
+  onCompleted: Mock;
+  onPhaseChange: Mock;
+  onAutoStartConsumed: Mock;
+  scheduleBeeps: Mock;
+  onShowInstructions: Mock;
 }
 
-function baseProps(overrides: Partial<Record<string, unknown>> = {}) {
+function baseProps(overrides: Partial<ExerciseSectionProps> = {}) {
   const harness: Harness = {
     onCompleted: vi.fn(),
     onPhaseChange: vi.fn(),
@@ -33,7 +33,7 @@ function baseProps(overrides: Partial<Record<string, unknown>> = {}) {
     scheduleBeeps: vi.fn(),
     onShowInstructions: vi.fn(),
   };
-  const props = {
+  const props: ExerciseSectionProps = {
     exercise: makeExercise(),
     nextExercise: makeExercise({
       id: 'next-1',
@@ -52,7 +52,7 @@ function baseProps(overrides: Partial<Record<string, unknown>> = {}) {
   return { harness, props };
 }
 
-function renderSection(overrides: Partial<Record<string, unknown>> = {}) {
+function renderSection(overrides: Partial<ExerciseSectionProps> = {}) {
   const { harness, props } = baseProps(overrides);
   const utils = render(
     <MotionConfig reducedMotion="always">

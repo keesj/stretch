@@ -12,6 +12,12 @@ const MS_WIDTH = 8;
 const COUNTER_WIDTH = 3;
 const DEVICE_WIDTH = 8;
 
+/**
+ * The shape of an encoded hlc (19 base36 chars). Shared with the sync
+ * server, which validates incoming ops against it before storing them.
+ */
+export const HLC_RE = /^[0-9a-z]{19}$/;
+
 export interface ParsedHlc {
   ms: number;
   counter: number;

@@ -2,11 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Finished } from '../Finished';
 
-const locationMock = { pathname: '/finished', search: '', hash: '', state: null, key: 'd' };
+const locationMock: { pathname: string; search: string; hash: string; state: unknown; key: string } = {
+  pathname: '/finished',
+  search: '',
+  hash: '',
+  state: null,
+  key: 'd',
+};
 const navigateMockRef: { fn: any } = { fn: undefined! };
 
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
     useNavigate: () => navigateMockRef.fn,

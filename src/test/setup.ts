@@ -1,4 +1,6 @@
-import '@testing-library/jest-dom';
+// The /vitest entry both registers the matchers for vitest's expect and
+// augments its Assertion type (so `toBeInTheDocument()` typechecks).
+import '@testing-library/jest-dom/vitest';
 
 // Ensure root element exists for modules that call createRoot (jsdom
 // tests only; server tests run in a node environment without a DOM)
@@ -44,7 +46,7 @@ vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
 
 // Mock react-router-dom useNavigate
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
     useNavigate: () => vi.fn(),

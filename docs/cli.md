@@ -1,12 +1,12 @@
 # Admin CLI
 
-`server/cli.js` records and inspects sync data from the command line. It
+`server/cli.ts` records and inspects sync data from the command line. It
 talks **directly to the server's SQLite database** (no HTTP, no tokens) —
 which makes it an admin tool: running it is equivalent to having write
 access to every account's journal.
 
 ```
-node server/cli.js <command> [args]
+node server/cli.ts <command> [args]
 ```
 
 ## Which database does it touch?
@@ -32,7 +32,7 @@ label is what the device sent at link time, or `device`). Use it to find an
 account id, or to see who is linked.
 
 ```
-$ node server/cli.js accounts
+$ node server/cli.ts accounts
 fdff4c7c-…  ops=15  devices=phone (owner)
 ```
 
@@ -42,7 +42,7 @@ Shows an account's journal as a human would: best plank hold per day
 (grouped per challenge), challenge start dates, sessions, and settings.
 
 ```
-$ node server/cli.js list fdff4c7c-…
+$ node server/cli.ts list fdff4c7c-…
 Account fdff4c7c-…  (14 ops, 1 active device(s))
 
 Plank days (plank, best hold per day):
@@ -76,7 +76,7 @@ Records a plank day (default challenge: `"plank"`, the first cohort). Rules:
   `"plank"`, matching the app's wire format.
 
 ```
-$ node server/cli.js plank fdff4c7c-… 2026-10-07 150
+$ node server/cli.ts plank fdff4c7c-… 2026-10-07 150
 Recorded 150s on 2026-10-07 for fdff4c7c-… (best for the day: 150s)
 ```
 
@@ -87,7 +87,7 @@ the challenge each day belongs to (`plank` for days without a `challengeId`,
 `plank-max` otherwise). `--challenge` filters to one challenge. Read-only.
 
 ```
-$ node server/cli.js planks 23323610-…
+$ node server/cli.ts planks 23323610-…
 2026-09-28  150s  plank
 2026-10-05  120s  plank
 2026-10-06  120s  plank
@@ -111,7 +111,7 @@ per hlc).
 - the date must be a real calendar date.
 
 ```
-$ node server/cli.js challenge 2026-10-28 --all --challenge plank-max
+$ node server/cli.ts challenge 2026-10-28 --all --challenge plank-max
 Challenge start 2026-10-28 (plank-max) recorded for 3 account(s)
 ```
 
@@ -133,7 +133,7 @@ migrated first.
 - `--all` migrates every account on the server.
 
 ```
-$ node server/cli.js migrate-planks 23323610-…
+$ node server/cli.ts migrate-planks 23323610-…
 Migrated 5 day(s) from plank to plank-max for 23323610-…:
   2026-09-28  150s
   2026-10-05  120s
@@ -159,11 +159,11 @@ its Squad/Chamber tabs once the account is in at least one.
   keep all their data; they just lose the tabs until re-added).
 
 ```
-$ node server/cli.js squads create Morning Plankers
+$ node server/cli.ts squads create Morning Plankers
 Created squad "Morning Plankers" (9f2c…)
-$ node server/cli.js squads add Morning Plankers fdff4c7c-…
+$ node server/cli.ts squads add Morning Plankers fdff4c7c-…
 Added fdff4c7c-… to "Morning Plankers" (1 member)
-$ node server/cli.js squads list
+$ node server/cli.ts squads list
 "Morning Plankers" (9f2c…)  members: fdff4c7c-…
 ```
 
@@ -177,15 +177,15 @@ the scratch-account recipe that keeps your real progress untouched:
 
 ```
 # 1. open the dev app in an incognito window -> it bootstraps a new account
-node server/cli.js accounts                    # find the new account id
-node server/cli.js challenge 2026-10-11 <NEW_ID> --challenge plank-max
+node server/cli.ts accounts                    # find the new account id
+node server/cli.ts challenge 2026-10-11 <NEW_ID> --challenge plank-max
 # 2. reload the incognito window: the cohort challenge is day 1 and active
 ```
 
 **Correct a cohort start date after a mistake:**
 
 ```
-node server/cli.js challenge 2026-11-01 <accountId> --challenge plank-max
+node server/cli.ts challenge 2026-11-01 <accountId> --challenge plank-max
 ```
 
 The later op wins on every device (LWW per hlc); the stale earlier op can
@@ -200,8 +200,8 @@ stay in the journal.
 #       plank      startDate 2026-09-26  (window closes 2026-10-25)
 #       plank-max  startDate 2026-10-28  (two rest days in between)
 # 2. push both start ops — INCOMING FIRST, OUTGOING LAST:
-node server/cli.js challenge 2026-10-28 --all --challenge plank-max
-node server/cli.js challenge 2026-09-26 --all
+node server/cli.ts challenge 2026-10-28 --all --challenge plank-max
+node server/cli.ts challenge 2026-09-26 --all
 # 3. deploy the app build with the new challenges.json — before the
 #    outgoing window closes, so devices are never left with no active
 #    challenge
@@ -220,7 +220,7 @@ entry actually leaves the config, unlike the hand-over above):
 
 ```
 # 1. copy the history into the successor (idempotent — safe to re-run)
-node server/cli.js migrate-planks --all
+node server/cli.ts migrate-planks --all
 # 2. deploy the app build whose challenges.json has dropped the entry
 ```
 
@@ -232,9 +232,9 @@ totals until someone runs the migration.
 **Stand up a squad before a cohort challenge starts:**
 
 ```
-node server/cli.js accounts                # find the members' account ids
-node server/cli.js squads create Plank Patrol
-node server/cli.js squads add Plank Patrol <accountId>
+node server/cli.ts accounts                # find the members' account ids
+node server/cli.ts squads create Plank Patrol
+node server/cli.ts squads add Plank Patrol <accountId>
 # …one add per member. The Squad/Chamber tabs appear in their apps as soon
 # as the squads request comes back (app reload, or the Standings page's
 # Refresh); no server restart needed.
@@ -242,11 +242,12 @@ node server/cli.js squads add Plank Patrol <accountId>
 
 ## Caveats
 
-- The CLI's challenge allowlists (`CHALLENGE_IDS`,
-  `COHORT_CHALLENGE_IDS`) are a **mirror** of the server's in
-  `server/api.js` — keep both in sync when a challenge is added.
+- The challenge allowlists (`CHALLENGE_IDS`, `COHORT_CHALLENGE_IDS`) are
+  **derived** from `src/data/challenges.json` in `server/challenges.ts` —
+  adding a challenge to that file is the only change needed, and a
+  malformed file fails the CLI and the server on boot with a clear error.
 - Because the CLI writes straight into the database, its validation
-  duplicates the server's (`server/cli.js` checks dates/seconds/ids before
+  duplicates the server's (`server/cli.ts` checks dates/seconds/ids before
   writing). If you ever bypass those checks (custom script), the server's
   push validation is the second line of defense — but only for ops that
   devices later push, not for rows inserted directly.

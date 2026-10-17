@@ -10,7 +10,7 @@ SQLite-backed sync server (Express).
 - [docs/sync-protocol.md](docs/sync-protocol.md) — how multi-device sync
   works: ops, the hybrid logical clock, replay semantics, identity and
   tokens, server validation, legacy migration, and versioning caveats.
-- [docs/cli.md](docs/cli.md) — the admin CLI (`node server/cli.js`):
+- [docs/cli.md](docs/cli.md) — the admin CLI (`node server/cli.ts`):
   inspecting accounts and recording plank days or challenge start dates.
 - [docs/pose-tool.md](docs/pose-tool.md) — how the exercise figures in
   `StretchAnimation.tsx` are generated from video with MediaPipe.
@@ -26,7 +26,7 @@ npm run build      # tsc -b && vite build
 ```
 
 The Vite dev server mounts the sync API in-process, so a fresh `npm run dev`
-needs no second node process. Production runs `server.js` (pm2), which serves
+needs no second node process. Production runs `server.ts` (pm2, Node ≥ 22.18 runs the TypeScript directly), which serves
 the built app from `dist/` plus the API on `PORT` (default 3021) behind a TLS
 front; data lives in `DATA_DIR` (default `~/.stretch/data`).
 

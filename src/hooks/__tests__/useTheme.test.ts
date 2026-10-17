@@ -98,14 +98,14 @@ describe('useTheme', () => {
       removeEventListener: vi.fn(),
     }));
 
-    const base = { soundEnabled: true, hapticEnabled: true };
+    const make = (theme: Settings['theme']): Settings => ({ theme, soundEnabled: true, hapticEnabled: true });
     const { rerender } = renderHook(({ settings }: { settings: Settings }) => useTheme(settings), {
-      initialProps: { settings: { theme: 'light' as const, ...base } },
+      initialProps: { settings: make('light') },
     });
 
     expect(document.documentElement.classList.contains('dark')).toBe(false);
 
-    rerender({ settings: { theme: 'dark' as const, ...base } });
+    rerender({ settings: make('dark') });
 
     expect(document.documentElement.classList.contains('dark')).toBe(true);
   });

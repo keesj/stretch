@@ -83,10 +83,10 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   syncNow: async () => {
     if (get().syncing) return;
     set({ syncing: true });
-      try {
-        freezeLegacyIfNeeded();
-        migrateLegacyIfNeeded();
-        let journal = loadJournal();
+    try {
+      freezeLegacyIfNeeded();
+      migrateLegacyIfNeeded();
+      let journal = loadJournal();
       try {
         await ensureToken();
         await syncRound(journal);

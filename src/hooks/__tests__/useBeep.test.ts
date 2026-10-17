@@ -25,7 +25,7 @@ function installMockAudioContext(): AudioMocks {
   }));
   const close = vi.fn();
 
-  function MockAudioContext() {
+  function MockAudioContext(this: Record<string, unknown>) {
     this.createOscillator = createOscillator;
     this.createGain = createGain;
     this.destination = {};

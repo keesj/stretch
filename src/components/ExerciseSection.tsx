@@ -11,7 +11,7 @@ import type { Stretch } from "../types/stretch";
 
 export type ExercisePhase = "ready" | "countdown" | "running" | "paused" | "completed";
 
-interface ExerciseSectionProps {
+export interface ExerciseSectionProps {
   exercise: Stretch;
   index: number;
   isActive: boolean;

@@ -19,7 +19,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('renders fallback element when error occurs', () => {
-    function Thrower() {
+    function Thrower(): never {
       throw new Error('Test error message');
     }
 
@@ -35,7 +35,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('renders default error UI when error occurs without custom fallback', () => {
-    function Thrower() {
+    function Thrower(): never {
       throw new Error('Test error message');
     }
 
@@ -50,7 +50,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('shows generic message when error has no message', () => {
-    function ThrowerNull() {
+    function ThrowerNull(): never {
       throw null;
     }
 
@@ -64,7 +64,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('does not render children in error state', () => {
-    function Thrower() {
+    function Thrower(): never {
       throw new Error('Test error message');
     }
 
@@ -80,7 +80,7 @@ describe('ErrorBoundary', () => {
   });
 
   it('renders reload button in error state', () => {
-    function Thrower() {
+    function Thrower(): never {
       throw new Error('Test error message');
     }
 

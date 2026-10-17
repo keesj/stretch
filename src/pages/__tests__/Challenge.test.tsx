@@ -6,7 +6,7 @@ import { Challenge } from '../Challenge';
 import { addDays, todayKey } from '../../utils/challenge';
 
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
     useNavigate: vi.fn(),
@@ -195,7 +195,7 @@ describe('Challenge page (plank cohort, Sep 26 – Oct 25)', () => {
 
     expect(await screen.findByText('Get ready…')).toBeInTheDocument();
     expect(mockScheduleBeeps).toHaveBeenCalledTimes(1);
-    const beeps = mockScheduleBeeps.mock.calls[0][0];
+    const beeps: { frequency: number; at: number; duration: number }[] = mockScheduleBeeps.mock.calls[0][0];
     expect(beeps[0]).toEqual({ frequency: 800, at: 0, duration: 0.1 });
     // Soft ticks every 30s of the 120s hold, starting 3s in
     expect(beeps.slice(3).map((b) => b.at)).toEqual([33, 63, 93]);
@@ -237,7 +237,7 @@ describe('Challenge page (plank cohort, Sep 26 – Oct 25)', () => {
     await user.click(bonusButton);
 
     expect(await screen.findByText('Get ready…')).toBeInTheDocument();
-    const beeps = mockScheduleBeeps.mock.calls[0][0];
+    const beeps: { frequency: number; at: number; duration: number }[] = mockScheduleBeeps.mock.calls[0][0];
     expect(beeps.slice(3).map((b) => b.at)).toEqual([33, 63, 93, 123]);
 
     await waitMs(3500);
@@ -278,7 +278,7 @@ describe('Challenge page (plank cohort, Sep 26 – Oct 25)', () => {
     await user.click(begin);
 
     expect(await screen.findByText('Get ready…')).toBeInTheDocument();
-    const beeps = mockScheduleBeeps.mock.calls[0][0];
+    const beeps: { frequency: number; at: number; duration: number }[] = mockScheduleBeeps.mock.calls[0][0];
     expect(beeps.slice(3).map((b) => b.at)).toEqual([33, 63, 93, 123, 153]);
 
     await waitMs(3500);
@@ -354,7 +354,7 @@ describe('Challenge page (plank cohort, Sep 26 – Oct 25)', () => {
 
       expect(await screen.findByText('Get ready…')).toBeInTheDocument();
       expect(mockScheduleBeeps).toHaveBeenCalledTimes(1);
-      const beeps = mockScheduleBeeps.mock.calls[0][0];
+      const beeps: { frequency: number; at: number; duration: number }[] = mockScheduleBeeps.mock.calls[0][0];
       expect(beeps[0]).toEqual({ frequency: 800, at: 0, duration: 0.1 });
       // Soft ticks every 30s up to the 10-minute cap, starting 3s in
       expect(beeps.slice(3).map((b) => b.at)).toEqual(

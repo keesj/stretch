@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { Settings } from '../Settings';
 
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
     useNavigate: vi.fn(),

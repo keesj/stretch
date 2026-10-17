@@ -1,8 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-// @ts-ignore - the server is plain ESM JavaScript, no type declarations
-import { createApiApp } from './server/api.js'
+import { createApiApp } from './server/api.ts'
 
 // https://vite.dev/config/
 export default defineConfig({

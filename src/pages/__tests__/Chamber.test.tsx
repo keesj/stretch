@@ -46,7 +46,7 @@ function storedCase() {
   return JSON.parse(localStorage.getItem('stretch.trophyCase') ?? '{}');
 }
 
-const earned = (c: unknown, el: unknown) => el?.textContent === '✓ Earned';
+const earned = (c: unknown, el: unknown) => (el as Element | null)?.textContent === '✓ Earned';
 
 describe('Chamber page', () => {
   it('shows an empty chamber with every trophy locked and an empty shelf', () => {

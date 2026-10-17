@@ -7,7 +7,7 @@ import { Settings } from '../Settings';
 const mockUseNavigate = vi.hoisted(() => vi.fn());
 
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
     useNavigate: () => mockUseNavigate,
@@ -61,7 +61,7 @@ describe('Settings Page', () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
     expect(screen.getByText('About')).toBeInTheDocument();
-    const row = screen.getByText('Build date').closest('.flex')!;
+    const row = screen.getByText('Build date').closest('.flex') as HTMLElement;
     const texts = within(row)
       .getAllByText(/.+/)
       .map((el) => el.textContent ?? '');
@@ -86,7 +86,7 @@ describe('Settings Page', () => {
 
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
-    const row = screen.getByText('Total Sessions').closest('.flex')!;
+    const row = screen.getByText('Total Sessions').closest('.flex') as HTMLElement;
     expect(within(row).getByText('1')).toBeInTheDocument();
   });
 
@@ -133,7 +133,7 @@ describe('Settings Page', () => {
   it('persists the sound preference when the toggle changes', () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
-    const checkbox = screen.getByText('Sound').closest('.flex')!
+    const checkbox = (screen.getByText('Sound').closest('.flex') as HTMLElement)
       .querySelector('input[type="checkbox"]') as HTMLInputElement;
 
     fireEvent.click(checkbox);
@@ -144,7 +144,7 @@ describe('Settings Page', () => {
   it('persists the haptic preference when the toggle changes', () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
-    const checkbox = screen.getByText('Haptic Feedback').closest('.flex')!
+    const checkbox = (screen.getByText('Haptic Feedback').closest('.flex') as HTMLElement)
       .querySelector('input[type="checkbox"]') as HTMLInputElement;
 
     fireEvent.click(checkbox);
@@ -170,7 +170,7 @@ describe('Settings Page', () => {
 
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
-    const row = screen.getByText('Total Sessions').closest('.flex')!;
+    const row = screen.getByText('Total Sessions').closest('.flex') as HTMLElement;
     expect(within(row).getByText('0')).toBeInTheDocument();
 
     act(() => {

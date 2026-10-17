@@ -7,7 +7,7 @@ import routinesData from '../../data/routines.json';
 const navigateMockRef = vi.hoisted(() => ({ fn: vi.fn() }));
 
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
     useNavigate: () => navigateMockRef.fn,
@@ -112,7 +112,7 @@ describe('Home Page', () => {
 
     render(<MemoryRouter><Home /></MemoryRouter>);
 
-    const stats = screen.getByText('sessions completed').closest('.flex')!;
+    const stats = screen.getByText('sessions completed').closest('.flex') as HTMLElement;
     expect(within(stats).getByText('3')).toBeInTheDocument();
     // 300 + 180 + 240 = 720 seconds = 12 minutes
     expect(within(stats).getByText('12')).toBeInTheDocument();
@@ -171,7 +171,7 @@ describe('Home Page', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'completedSessions' }));
     });
 
-    const stats = screen.getByText('sessions completed').closest('.flex')!;
+    const stats = screen.getByText('sessions completed').closest('.flex') as HTMLElement;
     expect(within(stats).getByText('1')).toBeInTheDocument();
   });
 });
