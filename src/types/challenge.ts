@@ -1,11 +1,30 @@
-export interface Challenge {
+interface ChallengeBase {
   id: string;
+  /**
+   * Identity of this challenge in the sync journal (the entity id of its
+   * ops). The legacy self-start challenge keeps "plank"; new challenges
+   * use their own id so both can live in one account's history.
+   */
+  syncId: string;
   title: string;
   description: string;
   exerciseId: string;
   totalDays: number;
-  /** Seconds required to complete a day */
+  /**
+   * Cohort start date (YYYY-MM-DD). When set, the challenge opens for
+   * everyone on this date and day N is startDate + N - 1 for all users
+   * (a shared clock, for social features). Self-start challenges omit it
+   * and each user's window begins on their first recorded day.
+   */
+  startDate?: string;
+  /** Seconds a hold needs to count as a completed (point-earning) day */
   baseSeconds: number;
+  illustration: string;
+}
+
+/** The original challenge: fixed hold lengths, fixed point tiers. */
+export interface ThresholdChallenge extends ChallengeBase {
+  scoring: "threshold";
   /** Extra seconds that earn the bonus points */
   bonusSeconds: number;
   bonusPoints: number;
@@ -18,8 +37,24 @@ export interface Challenge {
   milestoneSeconds: number;
   /** Points a milestone day is worth when the milestone hold is completed */
   milestonePoints: number;
-  illustration: string;
 }
+
+/** The reversed challenge: hold as long as you can, time-based points. */
+export interface DurationChallenge extends ChallengeBase {
+  scoring: "duration";
+  /** Points for reaching the base hold (the first point) */
+  basePoints: number;
+  /** Each full increment of this many seconds above the base earns incrementPoints */
+  incrementSeconds: number;
+  incrementPoints: number;
+  /** Holds past this earn no extra points (the scoring cap) */
+  maxSeconds: number;
+}
+
+export type Challenge = ThresholdChallenge | DurationChallenge;
+
+/** Holds shorter than this are not recorded (an accidental stop) */
+export const MIN_VALID_HOLD_SECONDS = 10;
 
 export interface ChallengeDay {
   /** Local calendar date, YYYY-MM-DD */
@@ -42,7 +77,7 @@ export interface ChallengeStatus {
   daysLeft: number;
   todayDone: boolean;
   todaySeconds: number;
-  /** Points earned today (0, 1, 1 + bonus, or milestone points) */
+  /** Points earned today (challenge-specific: tiers for threshold, time-based for duration) */
   todayPoints: number;
   /** True when today is a milestone day (every milestoneEvery-th day) */
   todayIsMilestone: boolean;
@@ -68,7 +103,7 @@ export const MAX_RECOVERY_DEFICIT = 2;
 export interface ChallengeDayDetail {
   date: string;
   dayNumber: number;
-  /** 1 | 1.5 | 2 (milestone day) | 0 (missed, pending today, or future) */
+  /** Points for the day (challenge-specific) | 0 (missed, pending today, or future) */
   plankPoints: number;
   /** A past day with no completed hold (misses earn 0, not negative) */
   isMissed: boolean;
@@ -111,4 +146,25 @@ export interface YearWeekBar {
   weekStart: string;
   weekNumber: number;
   points: number;
+}
+
+/** One day inside a windowed (e.g. 7-day) summary */
+export interface WindowDay {
+  date: string;
+  points: number;
+  isToday: boolean;
+}
+
+/** Aggregate over an inclusive date range — the "this week vs last week" view */
+export interface WindowSummary {
+  start: string;
+  end: string;
+  points: number;
+  /** Completed stretch sessions inside the window */
+  sessions: number;
+  /** Sum of the daily best plank holds inside the window */
+  plankSeconds: number;
+  /** Days in the window that earned at least one point */
+  activeDays: number;
+  days: WindowDay[];
 }

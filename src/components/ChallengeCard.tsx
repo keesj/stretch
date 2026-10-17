@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Card } from "./Card";
 import { Button } from "./Button";
 import { formatTime } from "../utils/timer";
+import { loadChallengeState, todayKey } from "../utils/challenge";
 import type { Challenge, ChallengeStatus } from "../types/challenge";
 
 interface ChallengeCardProps {
@@ -11,6 +12,14 @@ interface ChallengeCardProps {
   onBegin: () => void;
   onRestart: () => void;
   onProgress?: () => void;
+}
+
+function formatOpenDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export function ChallengeCard({
@@ -31,9 +40,22 @@ export function ChallengeCard({
     missedDays,
   } = status;
 
+  const isSelfStart = !challenge.startDate;
+  // A cohort challenge that has not opened yet cannot be started. The open
+  // date is the account's effective start (start op, or the configured one).
+  const effectiveStart = loadChallengeState(challenge).startedAt;
+  const opensAt =
+    phase === "not-started" && effectiveStart && effectiveStart > todayKey()
+      ? effectiveStart
+      : null;
+
   let button: ReactNode;
   if (phase === "not-started") {
-    button = (
+    button = opensAt ? (
+      <Button disabled className="w-full">
+        Opens {formatOpenDate(opensAt)}
+      </Button>
+    ) : (
       <Button onClick={onStart} className="w-full">
         Start Day 1
       </Button>
@@ -50,10 +72,16 @@ export function ChallengeCard({
         Completed today • +{todayPoints} pts
       </Button>
     );
-  } else {
+  } else if (isSelfStart) {
     button = (
       <Button onClick={onRestart} className="w-full">
         Start New Challenge
+      </Button>
+    );
+  } else {
+    button = (
+      <Button variant="outline" disabled className="w-full">
+        Finished
       </Button>
     );
   }
@@ -72,7 +100,9 @@ export function ChallengeCard({
       <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
         <span>
           {phase === "not-started"
-            ? `${challenge.totalDays} days • ${Math.floor(challenge.baseSeconds / 60)} min plank per day`
+            ? challenge.scoring === "duration"
+              ? `${challenge.totalDays} days • hold as long as you can`
+              : `${challenge.totalDays} days • ${Math.floor(challenge.baseSeconds / 60)} min plank per day`
             : phase === "complete"
               ? "Challenge complete 🏆"
               : `Day ${dayNumber} of ${challenge.totalDays} • ${daysLeft} left`}
@@ -96,11 +126,14 @@ export function ChallengeCard({
           Missed days: {missedDays}
         </div>
       )}
-      {phase === "active" && !todayDone && status.todayIsMilestone && (
-        <div className="text-xs font-medium text-primary-600 dark:text-primary-400 mb-3">
-          Milestone day: {formatTime(challenge.milestoneSeconds)} plank for {challenge.milestonePoints} pts
-        </div>
-      )}
+      {phase === "active" &&
+        !todayDone &&
+        status.todayIsMilestone &&
+        challenge.scoring === "threshold" && (
+          <div className="text-xs font-medium text-primary-600 dark:text-primary-400 mb-3">
+            Milestone day: {formatTime(challenge.milestoneSeconds)} plank for {challenge.milestonePoints} pts
+          </div>
+        )}
       <div className="space-y-3">
         {button}
         {phase !== "not-started" && onProgress && (

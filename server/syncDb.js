@@ -27,6 +27,11 @@ import Database from 'better-sqlite3';
  *   pair_codes(code PK, user_id, role, created_at, expires_at, redeemed_at)
  *   One-time, short-lived codes that let a new device mint a token.
  *
+ *   squads(id PK, name UNIQUE) + squad_members(squad_id, account_id)
+ *   Named groups of accounts, managed server-side (admin CLI only — there
+ *   is no squad op and no client-side mutation). Membership scopes the
+ *   social feed; the app only ever reads which squads its account is in.
+ *
  * hlc is a fixed-width sortable string, so plain lexicographic comparison
  * gives the same total order as the client's compareHlc.
  */
@@ -65,12 +70,22 @@ export function createSyncDb(dbPath, options = {}) {
     CREATE INDEX IF NOT EXISTS idx_tokens_user ON tokens (user_id);
     CREATE TABLE IF NOT EXISTS pair_codes (
       code        TEXT PRIMARY KEY,
-      user_id     TEXT NOT NULL,
+      user_id     TEXT    NOT NULL,
       role        TEXT    NOT NULL DEFAULT 'secondary',
       created_at  INTEGER NOT NULL,
       expires_at  INTEGER NOT NULL,
       redeemed_at INTEGER
     );
+    CREATE TABLE IF NOT EXISTS squads (
+      id   TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE
+    );
+    CREATE TABLE IF NOT EXISTS squad_members (
+      squad_id   TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      PRIMARY KEY (squad_id, account_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_squad_members_account ON squad_members (account_id);
   `);
 
   // --- device tokens -------------------------------------------------
@@ -201,6 +216,134 @@ export function createSyncDb(dbPath, options = {}) {
     }));
   };
 
+  // --- squads --------------------------------------------------------
+
+  const createSquad = (name) => {
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (trimmed.length < 1 || trimmed.length > 40) {
+      throw new Error('squad name must be 1-40 characters');
+    }
+    const dupe = db.prepare('SELECT id FROM squads WHERE lower(name) = lower(?)').get(trimmed);
+    if (dupe) throw new Error(`a squad named "${trimmed}" already exists`);
+    const id = crypto.randomUUID();
+    db.prepare('INSERT INTO squads (id, name) VALUES (?, ?)').run(id, trimmed);
+    return { id, name: trimmed };
+  };
+
+  // Resolve a squad reference: its id, or its name (case-insensitive).
+  const findSquad = (ref) => {
+    if (typeof ref !== 'string' || ref.length === 0) return null;
+    return db
+      .prepare('SELECT id, name FROM squads WHERE id = ? OR lower(name) = lower(?)')
+      .get(ref, ref) ?? null;
+  };
+
+  const squadMembers = (squadId) =>
+    db
+      .prepare('SELECT account_id FROM squad_members WHERE squad_id = ? ORDER BY account_id')
+      .all(squadId)
+      .map((row) => row.account_id);
+
+  const listSquads = () =>
+    db
+      .prepare('SELECT id, name FROM squads ORDER BY lower(name)')
+      .all()
+      .map((row) => ({ id: row.id, name: row.name, members: squadMembers(row.id) }));
+
+  const addSquadMember = (squadId, accountId) => {
+    if (!db.prepare('SELECT id FROM squads WHERE id = ?').get(squadId)) {
+      throw new Error('no such squad');
+    }
+    db.prepare('INSERT OR IGNORE INTO squad_members (squad_id, account_id) VALUES (?, ?)').run(
+      squadId,
+      accountId
+    );
+    return squadMembers(squadId).length;
+  };
+
+  const removeSquadMember = (squadId, accountId) =>
+    db
+      .prepare('DELETE FROM squad_members WHERE squad_id = ? AND account_id = ?')
+      .run(squadId, accountId).changes > 0;
+
+  const deleteSquad = (squadId) => {
+    db.prepare('DELETE FROM squad_members WHERE squad_id = ?').run(squadId);
+    return db.prepare('DELETE FROM squads WHERE id = ?').run(squadId).changes > 0;
+  };
+
+  const squadsForAccount = (accountId) =>
+    db
+      .prepare(
+        'SELECT s.id, s.name FROM squads s ' +
+          'JOIN squad_members m ON m.squad_id = s.id ' +
+          'WHERE m.account_id = ? ORDER BY lower(s.name)'
+      )
+      .all(accountId);
+
+  const isSquadMember = (squadId, accountId) =>
+    db
+      .prepare('SELECT 1 FROM squad_members WHERE squad_id = ? AND account_id = ?')
+      .get(squadId, accountId) !== undefined;
+
+  // Social feed for one challenge: per account, the profile (LWW), the
+  // challenge start (LWW), and the best hold per day. Dates on/after
+  // asOfKey are withheld — the quiet-day rule (the reveal is next day).
+  // Read-only derivation for the standings endpoint; the client computes
+  // points from the raw seconds. memberIds (a Set of account ids) scopes
+  // the feed to one squad's roster when given.
+  const socialFeed = (challengeId, asOfKey, memberIds) => {
+    const rows = db
+      .prepare("SELECT * FROM ops WHERE entity IN ('plankDay','challenge','profile')")
+      .all();
+    const byUser = new Map();
+    const entry = () => ({
+      profile: { name: '', avatar: '' },
+      profileHlc: '',
+      startedAt: null,
+      challengeHlc: '',
+      days: new Map()
+    });
+    const dataOf = (row) => (row.data === '{}' ? {} : JSON.parse(row.data));
+    for (const row of rows) {
+      if (memberIds && !memberIds.has(row.user_id)) continue;
+      const e = byUser.get(row.user_id) ?? entry();
+      byUser.set(row.user_id, e);
+      if (row.entity === 'profile') {
+        if (row.hlc > e.profileHlc) {
+          e.profileHlc = row.hlc;
+          const data = dataOf(row);
+          if (typeof data.name === 'string') e.profile.name = data.name;
+          if (typeof data.avatar === 'string') e.profile.avatar = data.avatar;
+        }
+      } else if (row.entity === 'challenge' && row.entity_id === challengeId) {
+        if (row.hlc > e.challengeHlc) {
+          e.challengeHlc = row.hlc;
+          const data = dataOf(row);
+          if (typeof data.startedAt === 'string') e.startedAt = data.startedAt;
+        }
+      } else if (row.entity === 'plankDay' && row.entity_id < asOfKey) {
+        const data = dataOf(row);
+        // Ops without a challengeId belong to the legacy "plank" challenge
+        // (mirrors the client replay routing).
+        const owns = data.challengeId === challengeId || (data.challengeId === undefined && challengeId === 'plank');
+        if (!owns || !Number.isFinite(data.seconds) || data.seconds <= 0) continue;
+        e.days.set(row.entity_id, Math.max(e.days.get(row.entity_id) ?? 0, data.seconds));
+      }
+    }
+    const roster = [];
+    for (const [accountId, e] of byUser) {
+      const hasPresence =
+        e.days.size > 0 || e.startedAt !== null || e.profile.name !== '' || e.profile.avatar !== '';
+      if (!hasPresence) continue;
+      const days = [...e.days.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, seconds]) => ({ date, seconds }));
+      roster.push({ accountId, name: e.profile.name, avatar: e.profile.avatar, startedAt: e.startedAt, days });
+    }
+    roster.sort((a, b) => a.accountId.localeCompare(b.accountId));
+    return roster;
+  };
+
   // Every account that has a token or any journal data (for the CLI's
   // `accounts` command).
   const accountIds = () =>
@@ -217,6 +360,16 @@ export function createSyncDb(dbPath, options = {}) {
     pull,
     opCount: (userId) =>
       db.prepare('SELECT COUNT(*) AS n FROM ops WHERE user_id = ?').get(userId).n,
+    socialFeed,
+    createSquad,
+    findSquad,
+    listSquads,
+    squadMembers,
+    addSquadMember,
+    removeSquadMember,
+    deleteSquad,
+    squadsForAccount,
+    isSquadMember,
     accountIds,
     mintToken,
     findAccountByToken,

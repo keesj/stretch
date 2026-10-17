@@ -1,18 +1,91 @@
 import { useMemo, useState } from "react";
 import { loadFromStorage, type CompletedSession } from "../utils/storage";
-import { loadPlankState } from "../utils/challenge";
+import { allChallengeEntries } from "../utils/challenge";
 import {
   getMonthBuckets,
   getOverallTotals,
+  getRecentDays,
+  getWeekComparison,
   getYearBuckets,
+  type ChallengeEntry,
 } from "../utils/progress";
-import type { Challenge, MonthDayBar, YearWeekBar } from "../types/challenge";
-
-import challengesData from "../data/challenges.json";
+import { formatTime } from "../utils/timer";
+import type { MonthDayBar, WindowDay, YearWeekBar } from "../types/challenge";
 
 const CHART_W = 320;
 const CHART_H = 140;
 const CHART_PAD = 24;
+
+const MINI_W = 140;
+const MINI_H = 44;
+
+function formatDayDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Seven tiny bars — the shape of one 7-day window. */
+function MiniBars({ days, ariaLabel }: { days: WindowDay[]; ariaLabel: string }) {
+  const max = Math.max(...days.map((d) => d.points), 1);
+  const slot = MINI_W / days.length;
+  const barW = slot * 0.62;
+  return (
+    <svg
+      viewBox={`0 0 ${MINI_W} ${MINI_H}`}
+      className="mt-1.5 w-full"
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <line
+        x1={0}
+        y1={MINI_H - 2}
+        x2={MINI_W}
+        y2={MINI_H - 2}
+        className="stroke-gray-200 dark:stroke-gray-700"
+        strokeWidth="1"
+      />
+      {days.map((d, i) => {
+        if (d.points <= 0) return null;
+        const h = (d.points / max) * (MINI_H - 6);
+        return (
+          <rect
+            key={d.date}
+            x={i * slot + (slot - barW) / 2}
+            y={MINI_H - 2 - h}
+            width={barW}
+            height={h}
+            rx={2}
+            className={
+              d.isToday
+                ? "fill-primary-600 dark:fill-primary-300"
+                : "fill-primary-400 dark:fill-primary-600"
+            }
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+/** The trend chip: how the current window compares to the previous one. */
+function weekDelta(current: number, previous: number) {
+  if (current === 0 && previous === 0) return null;
+  if (previous === 0) return { label: `+${current} pts`, tone: "up" as const };
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct === 0) return { label: "even", tone: "even" as const };
+  return pct > 0
+    ? { label: `▲ ${pct}%`, tone: "up" as const }
+    : { label: `▼ ${Math.abs(pct)}%`, tone: "down" as const };
+}
+
+const DELTA_TONES: Record<"up" | "down" | "even", string> = {
+  up: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  down: "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300",
+  even: "bg-gray-100 text-gray-500 dark:bg-gray-700/60 dark:text-gray-300",
+};
 
 const MONTH_NAMES = [
   "January",
@@ -93,8 +166,9 @@ function BarChart({ bars, labels, ariaLabel }: BarChartProps) {
 }
 
 export function Progress() {
-  const challenge = useMemo(() => (challengesData as Challenge[])[0], []);
-  const plankState = useMemo(() => loadPlankState(), []);
+  // All-time points span every challenge (the self-start one and the
+  // cohort one), each scored with its own formula.
+  const entries = useMemo<ChallengeEntry[]>(() => allChallengeEntries(), []);
   const sessions = useMemo(
     () => loadFromStorage<CompletedSession[]>("completedSessions", []),
     []
@@ -107,17 +181,25 @@ export function Progress() {
   }));
 
   const totals = useMemo(
-    () => getOverallTotals(challenge, plankState, sessions),
-    [challenge, plankState, sessions]
+    () => getOverallTotals(entries, sessions),
+    [entries, sessions]
   );
+  const week = useMemo(
+    () => getWeekComparison(entries, sessions),
+    [entries, sessions]
+  );
+  const recent = useMemo(
+    () => getRecentDays(entries, sessions),
+    [entries, sessions]
+  );
+  const delta = weekDelta(week.current.points, week.previous.points);
   const monthBars = useMemo(
-    () =>
-      getMonthBuckets(challenge, plankState, sessions, monthCursor.year, monthCursor.month),
-    [challenge, plankState, sessions, monthCursor]
+    () => getMonthBuckets(entries, sessions, monthCursor.year, monthCursor.month),
+    [entries, sessions, monthCursor]
   );
   const yearBars = useMemo(
-    () => getYearBuckets(challenge, plankState, sessions, monthCursor.year),
-    [challenge, plankState, sessions, monthCursor.year]
+    () => getYearBuckets(entries, sessions, monthCursor.year),
+    [entries, sessions, monthCursor.year]
   );
 
   const isCurrentMonth =
@@ -174,6 +256,92 @@ export function Progress() {
           Progress
         </h1>
         <div className="w-8" />
+      </div>
+
+      {/* The rolling 7-day windows: the answer to "am I doing more or less?" */}
+      <div className="bg-white/60 dark:bg-gray-800/60 rounded-xl p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            This week vs last week
+          </div>
+          {delta && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${DELTA_TONES[delta.tone]}`}
+            >
+              {delta.label}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {[
+            { title: "Last 7 days", win: week.current },
+            { title: "Previous 7 days", win: week.previous },
+          ].map(({ title, win }) => (
+            <div key={title}>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {title}
+              </div>
+              <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                {win.points}
+                <span className="ml-1 text-xs font-normal text-gray-400">pts</span>
+              </div>
+              <MiniBars days={win.days} ariaLabel={`Daily points for the ${title.toLowerCase()}`} />
+              <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                {win.sessions} session{win.sessions === 1 ? "" : "s"}
+                {win.plankSeconds > 0 && ` · ${formatTime(win.plankSeconds)} plank`} ·{" "}
+                {win.activeDays}/7 days
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* The last two weeks, day by day — what actually happened. */}
+      <div className="bg-white/60 dark:bg-gray-800/60 rounded-xl p-4 mb-6">
+        <div className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+          Recent days
+        </div>
+        <ul className="space-y-1">
+          {recent.map((d) => (
+            <li
+              key={d.date}
+              className={`flex items-center justify-between px-3 py-1.5 rounded-lg ${
+                d.isToday
+                  ? "bg-primary-100 dark:bg-primary-900/40"
+                  : "bg-white/40 dark:bg-gray-800/40"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-12 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  {formatDayDate(d.date)}
+                </span>
+                {d.isToday && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-400">
+                    Today
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+                {d.sessions > 0 && (
+                  <span>
+                    {d.sessions} session{d.sessions === 1 ? "" : "s"}
+                  </span>
+                )}
+                {d.plankSeconds > 0 && <span>{formatTime(d.plankSeconds)} plank</span>}
+                {d.sessions === 0 && d.plankSeconds === 0 && <span>rest</span>}
+              </div>
+              <span
+                className={`w-9 text-right text-sm font-bold ${
+                  d.total > 0
+                    ? "text-primary-600 dark:text-primary-400"
+                    : "text-gray-300 dark:text-gray-600"
+                }`}
+              >
+                {d.total > 0 ? `+${d.total}` : "—"}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="grid grid-cols-3 gap-2 mb-6">

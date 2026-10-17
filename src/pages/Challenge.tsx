@@ -4,27 +4,39 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "../components/Button";
 import { Timer } from "../components/Timer";
 import { useTimer } from "../hooks/useTimer";
+import { useCountUp } from "../hooks/useCountUp";
 import { useBeep } from "../hooks/useBeep";
 import { useWakeLock } from "../hooks/useWakeLock";
 import { formatTime } from "../utils/timer";
 import { loadFromStorage, DEFAULT_SETTINGS } from "../utils/storage";
 import {
-  loadPlankState,
-  startPlankChallenge,
-  completePlankDay,
+  activeChallenge,
+  loadChallengeState,
+  startChallenge,
+  completeChallengeDay,
   getChallengeStatus,
+  durationChallengeMaxPoints,
+  todayKey,
 } from "../utils/challenge";
-import type { Challenge, PlankChallengeState } from "../types/challenge";
+import { MIN_VALID_HOLD_SECONDS } from "../types/challenge";
+import type { PlankChallengeState } from "../types/challenge";
 import type { Stretch } from "../types/stretch";
 
-import challengesData from "../data/challenges.json";
 import stretchesData from "../data/stretches.json";
 
 type Phase = "intro" | "ready" | "countdown" | "holding" | "done";
 
+function formatOpenDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export function Challenge() {
   const navigate = useNavigate();
-  const challenge = useMemo(() => (challengesData as Challenge[])[0], []);
+  const challenge = useMemo(() => activeChallenge(), []);
   const exercise = useMemo(
     () => (stretchesData as Stretch[]).find((s) => s.id === challenge.exerciseId),
     [challenge]
@@ -34,12 +46,12 @@ export function Challenge() {
     loadFromStorage("settings", DEFAULT_SETTINGS).soundEnabled
   );
   const [plankState, setPlankState] = useState<PlankChallengeState>(() =>
-    loadPlankState()
+    loadChallengeState(challenge)
   );
   const status = getChallengeStatus(challenge, plankState);
 
   const [phase, setPhase] = useState<Phase>(() => {
-    const initial = getChallengeStatus(challenge, loadPlankState());
+    const initial = getChallengeStatus(challenge, loadChallengeState(challenge));
     if (initial.status === "not-started") return "intro";
     // A completed challenge shows the done screen (with a restart option
     // via the home card) instead of offering another hold for day 30.
@@ -58,10 +70,10 @@ export function Challenge() {
   // A sync round that absorbs remote ops rewrites the projection blobs;
   // pick the new state up without leaving the page.
   useEffect(() => {
-    const onRefresh = () => setPlankState(loadPlankState());
+    const onRefresh = () => setPlankState(loadChallengeState(challenge));
     window.addEventListener("stretch:data", onRefresh);
     return () => window.removeEventListener("stretch:data", onRefresh);
-  }, []);
+  }, [challenge]);
 
   const cancelCountdown = useCallback(() => {
     if (countdownRafRef.current != null) {
@@ -70,38 +82,39 @@ export function Challenge() {
     }
   }, []);
 
-  const handleHoldComplete = useCallback(() => {
-    if (phaseRef.current === "holding") {
-      setPlankState(completePlankDay(holdSeconds));
-      setPhase("done");
-      playHappyBeep();
-    }
-  }, [holdSeconds, playHappyBeep]);
-
   const { timeLeft, isRunning, start, pause, reset: resetTimer } = useTimer({
     initialTime: challenge.baseSeconds,
-    onComplete: handleHoldComplete,
+    onComplete: () => {
+      if (phaseRef.current === "holding") {
+        setPlankState(completeChallengeDay(challenge, holdSeconds));
+        setPhase("done");
+        playHappyBeep();
+      }
+    },
   });
 
-  useWakeLock({ isActive: isRunning || phase === "countdown" });
+  const {
+    elapsed: countUpElapsed,
+    isRunning: countUpRunning,
+    start: startCountUp,
+    pause: pauseCountUp,
+    reset: resetCountUp,
+    getElapsedMs: getCountUpMs,
+  } = useCountUp();
+
+  useWakeLock({
+    isActive: isRunning || countUpRunning || phase === "countdown",
+  });
 
   useEffect(() => cancelCountdown, [cancelCountdown]);
 
-  const beginHold = useCallback(
-    (seconds: number) => {
+  /** Run the 3-2-1 countdown, then call `onReady` on the same clock. */
+  const runCountdown = useCallback(
+    (beeps: { frequency: number; at: number; duration: number }[], onReady: () => void) => {
       cancelCountdown();
-      setHoldSeconds(seconds);
       setCountNumber(3);
       setPhase("countdown");
-
-      const ticks: number[] = [];
-      for (let t = 30; t < seconds; t += 30) ticks.push(t);
-      scheduleBeeps([
-        { frequency: 800, at: 0, duration: 0.1 },
-        { frequency: 800, at: 1, duration: 0.1 },
-        { frequency: 800, at: 2, duration: 0.1 },
-        ...ticks.map((at) => ({ frequency: 560, at: at + 3, duration: 0.08 })),
-      ]);
+      scheduleBeeps(beeps);
 
       // Derive the countdown from the clock every frame instead of
       // stacking setTimeouts: the numbers stay in sync with the beeps
@@ -115,9 +128,7 @@ export function Challenge() {
         const elapsed = elapsedAt();
         if (elapsed >= 3) {
           countdownRafRef.current = null;
-          resetTimer(seconds);
-          start();
-          setPhase("holding");
+          onReady();
           return;
         }
         setCountNumber(Math.max(3 - Math.floor(elapsed), 1));
@@ -125,20 +136,91 @@ export function Challenge() {
       };
       countdownRafRef.current = requestAnimationFrame(tick);
     },
-    [cancelCountdown, scheduleBeeps, getClock, resetTimer, start]
+    [cancelCountdown, scheduleBeeps, getClock]
   );
 
+  const beginHold = useCallback(
+    (seconds: number) => {
+      setHoldSeconds(seconds);
+      const ticks: number[] = [];
+      for (let t = 30; t < seconds; t += 30) ticks.push(t);
+      runCountdown(
+        [
+          { frequency: 800, at: 0, duration: 0.1 },
+          { frequency: 800, at: 1, duration: 0.1 },
+          { frequency: 800, at: 2, duration: 0.1 },
+          ...ticks.map((at) => ({ frequency: 560, at: at + 3, duration: 0.08 })),
+        ],
+        () => {
+          resetTimer(seconds);
+          start();
+          setPhase("holding");
+        }
+      );
+    },
+    [runCountdown, resetTimer, start]
+  );
+
+  const beginDurationHold = useCallback(() => {
+    if (challenge.scoring !== "duration") return;
+    const max = challenge.maxSeconds;
+    resetCountUp();
+    const ticks: number[] = [];
+    for (let t = 30; t <= max; t += 30) ticks.push(t);
+    runCountdown(
+      [
+        { frequency: 800, at: 0, duration: 0.1 },
+        { frequency: 800, at: 1, duration: 0.1 },
+        { frequency: 800, at: 2, duration: 0.1 },
+        ...ticks.map((at) => ({ frequency: 560, at: at + 3, duration: 0.08 })),
+      ],
+      () => {
+        startCountUp();
+        setPhase("holding");
+      }
+    );
+  }, [challenge, runCountdown, resetCountUp, startCountUp]);
+
+  /** Stop the duration hold and record the elapsed time (best of day). */
+  const handleStopDuration = useCallback(() => {
+    if (challenge.scoring !== "duration" || phaseRef.current !== "holding") return;
+    const seconds = Math.round(getCountUpMs() / 1000);
+    if (seconds < MIN_VALID_HOLD_SECONDS) return;
+    pauseCountUp();
+    setPlankState(completeChallengeDay(challenge, seconds));
+    setPhase("done");
+    playHappyBeep();
+  }, [challenge, getCountUpMs, pauseCountUp, playHappyBeep]);
+
   const handleStartChallenge = useCallback(() => {
-    setPlankState(startPlankChallenge());
+    setPlankState(startChallenge(challenge));
     setPhase("ready");
-  }, []);
+  }, [challenge]);
 
   const handleBack = useCallback(() => {
     cancelCountdown();
     navigate("/");
   }, [cancelCountdown, navigate]);
 
+  const isThreshold = challenge.scoring === "threshold";
+  const isDuration = challenge.scoring === "duration";
+  const maxSeconds = isDuration ? challenge.maxSeconds : challenge.baseSeconds;
+  const maxPoints = isDuration ? durationChallengeMaxPoints(challenge) : 0;
+  // A cohort challenge that has not opened yet: no start button, only the
+  // date it opens on (the account's effective start date).
+  const opensAt =
+    status.status === "not-started" && plankState.startedAt && plankState.startedAt > todayKey()
+      ? plankState.startedAt
+      : null;
+
   const total = holdSeconds;
+
+  // The last stretch instruction is the fixed-hold rule of the threshold
+  // challenge ("Hold for 2 minutes (30 extra seconds earns bonus points)");
+  // a duration challenge explains its own rules below the button instead.
+  const readyInstructions = isDuration
+    ? exercise?.instructions.filter((line) => !/bonus points/i.test(line)) ?? []
+    : exercise?.instructions ?? [];
 
   const isHoldPhase = phase === "holding";
 
@@ -188,36 +270,76 @@ export function Challenge() {
                 {challenge.description}
               </p>
               <div className="w-full space-y-2 mb-8 text-sm">
-                <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {Math.floor(challenge.baseSeconds / 60)} min plank, every day
-                  </span>
-                  <span className="font-semibold text-primary-600 dark:text-primary-400">+1 pt</span>
-                </div>
-                <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-300">
-                    Every {challenge.milestoneEvery}th day: {formatTime(challenge.milestoneSeconds)} plank (instead of {formatTime(challenge.baseSeconds)})
-                  </span>
-                  <span className="font-semibold text-primary-600 dark:text-primary-400">
-                    {challenge.milestonePoints} pts
-                  </span>
-                </div>
-                <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-300">Missed a day</span>
-                  <span className="font-semibold text-gray-500 dark:text-gray-400">0 pts</span>
-                </div>
-                <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-300">
-                    +{challenge.bonusSeconds}s extra hold (after a miss)
-                  </span>
-                  <span className="font-semibold text-primary-600 dark:text-primary-400">
-                    +{challenge.bonusPoints} pts
-                  </span>
-                </div>
+                {isThreshold && (
+                  <>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        {Math.floor(challenge.baseSeconds / 60)} min plank, every day
+                      </span>
+                      <span className="font-semibold text-primary-600 dark:text-primary-400">+1 pt</span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        Every {challenge.milestoneEvery}th day: {formatTime(challenge.milestoneSeconds)} plank (instead of {formatTime(challenge.baseSeconds)})
+                      </span>
+                      <span className="font-semibold text-primary-600 dark:text-primary-400">
+                        {challenge.milestonePoints} pts
+                      </span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        +{challenge.bonusSeconds}s extra hold (after a miss)
+                      </span>
+                      <span className="font-semibold text-primary-600 dark:text-primary-400">
+                        +{challenge.bonusPoints} pts
+                      </span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">Missed a day</span>
+                      <span className="font-semibold text-gray-500 dark:text-gray-400">0 pts</span>
+                    </div>
+                  </>
+                )}
+                {isDuration && (
+                  <>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        First {Math.floor(challenge.baseSeconds / 60)} min
+                      </span>
+                      <span className="font-semibold text-primary-600 dark:text-primary-400">+{challenge.basePoints} pt</span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        Each extra {challenge.incrementSeconds}s
+                      </span>
+                      <span className="font-semibold text-primary-600 dark:text-primary-400">
+                        +{challenge.incrementPoints} pts
+                      </span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">
+                        {Math.floor(challenge.maxSeconds / 60)} min hold (max)
+                      </span>
+                      <span className="font-semibold text-primary-600 dark:text-primary-400">
+                        {maxPoints} pts
+                      </span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">Missed a day</span>
+                      <span className="font-semibold text-gray-500 dark:text-gray-400">0 pts</span>
+                    </div>
+                  </>
+                )}
               </div>
-              <Button onClick={handleStartChallenge} className="w-full">
-                Start Challenge
-              </Button>
+              {opensAt ? (
+                <div className="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 px-4 py-3 text-sm font-semibold text-gray-600 dark:text-gray-300">
+                  Opens {formatOpenDate(opensAt)}
+                </div>
+              ) : (
+                <Button onClick={handleStartChallenge} className="w-full">
+                  Start Challenge
+                </Button>
+              )}
             </div>
           )}
 
@@ -229,7 +351,7 @@ export function Challenge() {
                 Score: {status.score} pts
               </div>
               <div className="w-full bg-white/60 dark:bg-gray-800/60 rounded-xl p-4 mb-8 space-y-2 text-left">
-                {exercise.instructions.map((instruction, index) => (
+                {readyInstructions.map((instruction, index) => (
                   <div
                     key={index}
                     className="text-sm text-gray-600 dark:text-gray-300"
@@ -239,13 +361,20 @@ export function Challenge() {
                 ))}
               </div>
               <div className="w-full space-y-3">
-                <Button
-                  onClick={() => beginHold(challenge.baseSeconds)}
-                  className="w-full"
-                >
-                  Begin {formatTime(challenge.baseSeconds)} Plank (+1 pt)
-                </Button>
-                {status.todayIsMilestone && (
+                {isDuration && (
+                  <Button onClick={beginDurationHold} className="w-full">
+                    Start Plank
+                  </Button>
+                )}
+                {isThreshold && (
+                  <Button
+                    onClick={() => beginHold(challenge.baseSeconds)}
+                    className="w-full"
+                  >
+                    Begin {formatTime(challenge.baseSeconds)} Plank (+1 pt)
+                  </Button>
+                )}
+                {isThreshold && status.todayIsMilestone && (
                   <Button
                     variant="secondary"
                     onClick={() => beginHold(challenge.milestoneSeconds)}
@@ -254,7 +383,7 @@ export function Challenge() {
                     Begin {formatTime(challenge.milestoneSeconds)} Plank (+{challenge.milestonePoints} pts)
                   </Button>
                 )}
-                {status.bonusAvailable && (
+                {isThreshold && status.bonusAvailable && (
                   <Button
                     variant="secondary"
                     onClick={() =>
@@ -266,7 +395,11 @@ export function Challenge() {
                   </Button>
                 )}
               </div>
-              {status.bonusAvailable ? (
+              {isDuration ? (
+                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 max-w-xs">
+                  Hold as long as you can, then press stop. Your best hold of the day counts.
+                </p>
+              ) : status.bonusAvailable ? (
                 <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 max-w-xs">
                   You&apos;re behind the pace — the extra hold counts as +
                   {challenge.bonusPoints} extra pts for today.
@@ -296,7 +429,7 @@ export function Challenge() {
             </div>
           )}
 
-          {isHoldPhase && (
+          {isHoldPhase && isThreshold && (
             <div className="flex-1 flex flex-col items-center justify-center">
               <Timer
                 displayTime={timeLeft}
@@ -321,6 +454,39 @@ export function Challenge() {
             </div>
           )}
 
+          {isHoldPhase && isDuration && (
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <Timer
+                displayTime={Math.max(maxSeconds - Math.min(countUpElapsed, maxSeconds), 0)}
+                totalDuration={maxSeconds}
+                isRunning={countUpRunning}
+                isPaused={!countUpRunning}
+                displayText={formatTime(countUpElapsed)}
+                breathing
+              />
+
+              <div className="mt-10 w-full flex gap-3">
+                <Button onClick={handleStopDuration} className="flex-1">
+                  Stop
+                </Button>
+                {countUpRunning ? (
+                  <Button variant="secondary" onClick={pauseCountUp} className="flex-1">
+                    Pause
+                  </Button>
+                ) : (
+                  <Button variant="secondary" onClick={startCountUp} className="flex-1">
+                    Resume
+                  </Button>
+                )}
+              </div>
+              {countUpElapsed < MIN_VALID_HOLD_SECONDS && (
+                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 max-w-xs">
+                  Hold for at least {MIN_VALID_HOLD_SECONDS} seconds to count
+                </p>
+              )}
+            </div>
+          )}
+
           {phase === "done" && (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
               <motion.div
@@ -336,6 +502,11 @@ export function Challenge() {
               <h1 className="text-3xl font-bold mb-2">
                 Day {status.dayNumber} complete!
               </h1>
+              {status.status !== "complete" && status.todaySeconds > 0 && (
+                <div className="text-gray-600 dark:text-gray-400 mb-2">
+                  {isDuration ? `Best hold today: ${formatTime(status.todaySeconds)}` : null}
+                </div>
+              )}
               {status.status !== "complete" && (
                 <div className="text-primary-600 dark:text-primary-400 font-semibold mb-2">
                   +{status.todayPoints} pts today

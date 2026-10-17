@@ -51,17 +51,24 @@ describe('Progress page', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('shows totals, a month and a year bar chart', () => {
+  it('shows week comparison, recent days, totals, and the bar charts', () => {
     const today = todayKey();
-    // Plank hold today (+1) plus two unique routines today (+2) = 3 total
+    // Today: a 2-minute plank (+1) plus three unique routines (+3) = 4 in
+    // the current window. Fourteen days ago: another plank day, outside
+    // both 7-day windows, so the all-time totals (2 plank / 3 routine /
+    // 5 total) differ from the current window.
     setStorage({
-      plankChallenge: JSON.stringify({
-        startedAt: addDays(today, -1),
-        days: [{ date: today, seconds: 120 }],
+      'challenge:plank-max': JSON.stringify({
+        startedAt: addDays(today, -15),
+        days: [
+          { date: today, seconds: 120 },
+          { date: addDays(today, -14), seconds: 120 },
+        ],
       }),
       completedSessions: JSON.stringify([
         { id: 's1', routineId: 'wake-up-workout', routineTitle: 'Wake Up', duration: 10, completedAt: iso(today, 8) },
-        { id: 's2', routineId: 'evening-unwind', routineTitle: 'Evening', duration: 10, completedAt: iso(today, 19) },
+        { id: 's2', routineId: 'evening-unwind', routineTitle: 'Evening', duration: 10, completedAt: iso(today, 12) },
+        { id: 's3', routineId: 'midday-reset', routineTitle: 'Midday', duration: 10, completedAt: iso(today, 19) },
       ]),
     });
 
@@ -71,18 +78,30 @@ describe('Progress page', () => {
       </MemoryRouter>
     );
 
-    // Totals: routines 2 and combined 3 (plank 1 shares the "1" label
-    // with the month chart's day-1 tick)
+    // Week comparison: 4 pts in the current window, none before it.
+    expect(screen.getByText('This week vs last week')).toBeInTheDocument();
+    expect(screen.getByText('Last 7 days')).toBeInTheDocument();
+    expect(screen.getByText('Previous 7 days')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('+4 pts')).toBeInTheDocument();
+
+    // Recent days list: today's row with its points.
+    expect(screen.getByText('Recent days')).toBeInTheDocument();
+    expect(screen.getByText('Today')).toBeInTheDocument();
+    expect(screen.getByText('+4')).toBeInTheDocument();
+
+    // All-time totals: plank 2, routines 3, total 5.
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
 
     const now = new Date();
     expect(screen.getByText(monthLabel(now.getFullYear(), now.getMonth()))).toBeInTheDocument();
     expect(screen.getByText(`${now.getFullYear()} · weekly`)).toBeInTheDocument();
 
-    // Two charts (month + year), each with at least one bar
+    // Four charts: two 7-day mini charts plus month and year.
     const charts = container.querySelectorAll('svg[role="img"]');
-    expect(charts).toHaveLength(2);
+    expect(charts).toHaveLength(4);
     expect(container.querySelectorAll('rect').length).toBeGreaterThan(0);
 
     // Navigation: next month is disabled on the current month, previous works
@@ -93,5 +112,26 @@ describe('Progress page', () => {
         screen.getByText(monthLabel(prev.getFullYear(), prev.getMonth()))
       ).toBeInTheDocument();
     });
+  });
+
+  it('shows a down trend when the previous week was stronger', () => {
+    const today = todayKey();
+    // Three routine days in the previous window, one today: 1 vs 3 pts.
+    setStorage({
+      completedSessions: JSON.stringify([
+        { id: 's1', routineId: 'r1', routineTitle: 'T', duration: 10, completedAt: iso(addDays(today, -8)) },
+        { id: 's2', routineId: 'r2', routineTitle: 'T', duration: 10, completedAt: iso(addDays(today, -9)) },
+        { id: 's3', routineId: 'r3', routineTitle: 'T', duration: 10, completedAt: iso(addDays(today, -10)) },
+        { id: 's4', routineId: 'r1', routineTitle: 'T', duration: 10, completedAt: iso(today) },
+      ]),
+    });
+
+    render(
+      <MemoryRouter>
+        <Progress />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('▼ 67%')).toBeInTheDocument();
   });
 });

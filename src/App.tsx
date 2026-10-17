@@ -8,6 +8,8 @@ import { Settings } from "./pages/Settings";
 import { Challenge } from "./pages/Challenge";
 import { ChallengeProgress } from "./pages/ChallengeProgress";
 import { Progress } from "./pages/Progress";
+import { Standings } from "./pages/Standings";
+import { Chamber } from "./pages/Chamber";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useLocation } from "react-router-dom";
@@ -54,6 +56,8 @@ function App() {
             <Route path="/challenge" element={<Challenge />} />
             <Route path="/challenge/progress" element={<ChallengeProgress />} />
             <Route path="/progress" element={<Progress />} />
+            <Route path="/standings" element={<Standings />} />
+            <Route path="/chamber" element={<Chamber />} />
             <Route path="/finished" element={<Finished />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

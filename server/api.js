@@ -10,9 +10,18 @@ const HLC_RE = /^[0-9a-z]{19}$/;
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
 const PAIR_CODE_RE = /^[a-f0-9]{16}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const ENTITIES = new Set(['plankDay', 'challenge', 'session', 'settings', 'reset']);
+const ENTITIES = new Set(['plankDay', 'challenge', 'session', 'settings', 'profile', 'trophyCase', 'reset']);
 const KINDS = new Set(['create', 'patch']);
 const MAX_PUSH_OPS = 1000;
+
+// Known challenge sync ids (mirror of src/data/challenges.json). The
+// server stays deliberately dumb about challenge rules — it only rejects
+// ids no app build could have produced.
+const CHALLENGE_IDS = new Set(['plank', 'plank-max']);
+// Cohort challenges open for everyone on a shared start date, so their
+// start op is pushed (by the admin CLI) before the date arrives.
+const COHORT_CHALLENGE_IDS = new Set(['plank-max']);
+const CHALLENGE_START_AHEAD_MS = 60 * 24 * 3600 * 1000;
 
 // Validation limits. The app itself only ever records what the timer
 // actually ran, so these bounds are generous for honest use and stop
@@ -107,6 +116,10 @@ export function validateStretchOp(op, nowMs = Date.now()) {
     if (!isPlainObject(op.data) || !isInt(op.data.seconds, 1, PLANK_SECONDS_MAX)) {
       return `plankDay seconds must be an integer between 1 and ${PLANK_SECONDS_MAX}`;
     }
+    const challengeId = op.data.challengeId;
+    if (challengeId !== undefined && (typeof challengeId !== 'string' || !CHALLENGE_IDS.has(challengeId))) {
+      return 'plankDay challengeId is unknown';
+    }
     const start = dateStartMs(op.entityId);
     if (hlcMs(op.hlc) < start - CLOCK_SKEW_MS) return 'plankDay was recorded before its date';
     return null;
@@ -114,11 +127,19 @@ export function validateStretchOp(op, nowMs = Date.now()) {
 
   if (op.entity === 'challenge') {
     if (op.kind !== 'create') return 'challenge ops must be create';
-    if (op.entityId !== 'plank') return 'unknown challenge id';
+    if (!CHALLENGE_IDS.has(op.entityId)) return 'unknown challenge id';
     if (!isPlainObject(op.data) || typeof op.data.startedAt !== 'string') {
       return 'challenge data must carry startedAt';
     }
-    if (!isValidDate(op.data.startedAt, nowMs)) return 'challenge start date is invalid or in the future';
+    const start = dateStartMs(op.data.startedAt);
+    if (start === null) return 'challenge start date is invalid';
+    if (start > nowMs) {
+      // Only cohort challenges may open in the future (the admin CLI
+      // pushes the shared start date ahead of time).
+      if (!COHORT_CHALLENGE_IDS.has(op.entityId) || start > nowMs + CHALLENGE_START_AHEAD_MS) {
+        return 'challenge start date is in the future';
+      }
+    }
     return null;
   }
 
@@ -153,6 +174,62 @@ export function validateStretchOp(op, nowMs = Date.now()) {
         if (typeof value !== 'boolean') return `settings ${key} must be a boolean`;
       } else {
         return `unknown settings field: ${key}`;
+      }
+    }
+    return null;
+  }
+
+  if (op.entity === 'profile') {
+    if (op.kind !== 'patch') return 'profile ops must be patch';
+    if (op.entityId !== 'me') return 'unknown profile id';
+    if (!isPlainObject(op.data) || Object.keys(op.data).length === 0) return 'profile data must be a non-empty object';
+    for (const [key, value] of Object.entries(op.data)) {
+      if (key === 'name') {
+        if (typeof value !== 'string' || value.length > 24) return 'profile name must be a string (max 24)';
+      } else if (key === 'avatar') {
+        if (typeof value !== 'string' || value.length > 8) return 'profile avatar must be a string (max 8)';
+      } else {
+        return `unknown profile field: ${key}`;
+      }
+    }
+    return null;
+  }
+
+  if (op.entity === 'trophyCase') {
+    if (op.kind !== 'patch') return 'trophyCase ops must be patch';
+    if (op.entityId !== 'me') return 'unknown trophyCase id';
+    if (!isPlainObject(op.data) || Object.keys(op.data).length === 0) return 'trophyCase data must be a non-empty object';
+    for (const [key, value] of Object.entries(op.data)) {
+      if (key === 'background') {
+        if (typeof value !== 'string' || value.length === 0 || value.length > 24) return 'trophyCase background must be a string (1-24)';
+      } else if (key === 'items') {
+        if (!Array.isArray(value) || value.length > 24) return 'trophyCase items must be an array (max 24)';
+        for (const it of value) {
+          if (!isPlainObject(it)) return 'trophyCase items must be objects';
+          if (typeof it.item !== 'string' || it.item.length === 0 || it.item.length > 24) {
+            return 'trophyCase item id must be a string (1-24)';
+          }
+          if (typeof it.x !== 'number' || !Number.isFinite(it.x) || it.x < 0 || it.x > 100) {
+            return 'trophyCase item x must be a number (0-100)';
+          }
+          if (typeof it.y !== 'number' || !Number.isFinite(it.y) || it.y < 0 || it.y > 100) {
+            return 'trophyCase item y must be a number (0-100)';
+          }
+          if (it.size !== undefined && it.size !== 1 && it.size !== 2) {
+            return 'trophyCase item size must be 1 or 2';
+          }
+        }
+      } else if (key === 'slots') {
+        // Legacy shelf shape (pre-free-placement); still accepted so the
+        // replay can normalize it to item positions.
+        if (!Array.isArray(value) || value.length > 16) return 'trophyCase slots must be an array (max 16)';
+        for (const s of value) {
+          if (s !== null && (typeof s !== 'string' || s.length === 0 || s.length > 24)) {
+            return 'trophyCase slots must be null or strings (1-24)';
+          }
+        }
+      } else {
+        return `unknown trophyCase field: ${key}`;
       }
     }
     return null;
@@ -315,6 +392,46 @@ export function createApiApp(options = {}) {
       const { since } = req.body ?? {};
       const cursor = typeof since === 'string' && HLC_RE.test(since) ? since : null;
       res.json({ ops: db.pull(req.userId, cursor), serverTime: Date.now() });
+    }
+  );
+
+  // The caller's squads: named groups of accounts, managed server-side
+  // (admin CLI only). The app uses this to decide whether the Squad and
+  // Chamber tabs exist at all.
+  api.get(
+    '/social/squads',
+    requireAuth,
+    (req, res, next) => (limited ? authLimiter(req, res, next) : next()),
+    (req, res) => {
+      res.json({ squads: db.squadsForAccount(req.userId) });
+    }
+  );
+
+  // Social standings: a read-only projection of one squad for one
+  // challenge (profiles + raw best holds per day). Authenticated like the
+  // sync endpoints — the group is the squad's membership, not the whole
+  // server, and only members may read the feed. The quiet-day rule is
+  // enforced here: no today/future dates are returned, so a live
+  // in-progress ranking is impossible by construction.
+  api.get(
+    '/social/standings',
+    requireAuth,
+    (req, res, next) => (limited ? authLimiter(req, res, next) : next()),
+    (req, res) => {
+      const challenge = req.query.challenge;
+      if (typeof challenge !== 'string' || !CHALLENGE_IDS.has(challenge)) {
+        return badRequest(res, 'challenge must be a known challenge id');
+      }
+      const squad = req.query.squad;
+      if (typeof squad !== 'string' || squad.length === 0 || squad.length > 64) {
+        return badRequest(res, 'squad is required');
+      }
+      if (!db.isSquadMember(squad, req.userId)) {
+        return forbidden(res, 'you are not a member of that squad');
+      }
+      const now = new Date();
+      const asOf = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      res.json({ asOf, roster: db.socialFeed(challenge, asOf, new Set(db.squadMembers(squad))) });
     }
   );
 

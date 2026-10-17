@@ -3,13 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "../components/Button";
 import {
-  loadPlankState,
+  activeChallenge,
+  loadChallengeState,
   getChallengeStatus,
   getChallengeProgress,
 } from "../utils/challenge";
-import type { Challenge } from "../types/challenge";
-
-import challengesData from "../data/challenges.json";
 
 const CHART_W = 320;
 const CHART_H = 140;
@@ -31,9 +29,12 @@ function formatPlankPoints(points: number, isMissed: boolean): string {
 
 export function ChallengeProgress() {
   const navigate = useNavigate();
-  const challenge = useMemo(() => (challengesData as Challenge[])[0], []);
+  const challenge = useMemo(() => activeChallenge(), []);
 
-  const plankState = useMemo(() => loadPlankState(), []);
+  const plankState = useMemo(
+    () => loadChallengeState(challenge),
+    [challenge]
+  );
   const status = useMemo(
     () => getChallengeStatus(challenge, plankState),
     [challenge, plankState]
@@ -172,8 +173,10 @@ export function ChallengeProgress() {
             </svg>
           </div>
 
+          {/* Newest day first — yesterday matters more than day 1. The
+              chart above keeps the chronological story. */}
           <ul className="space-y-1.5 overflow-y-auto">
-            {doneDays.map((d) => (
+            {[...doneDays].reverse().map((d) => (
               <motion.li
                 key={d.date}
                 initial={{ opacity: 0, y: 8 }}

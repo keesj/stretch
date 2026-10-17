@@ -22,6 +22,8 @@ const LEGACY: LegacyBase = {
     },
   ],
   settings: { theme: "dark", soundEnabled: true, hapticEnabled: true },
+  profile: { name: "", avatar: "" },
+  trophyCase: { background: "classic", items: [] },
 };
 
 function seedLegacy(legacy: LegacyBase): void {
@@ -142,6 +144,8 @@ describe("legacyToOps", () => {
       },
       sessions: [{ id: "ok", routineId: "r", routineTitle: "t", duration: 10, completedAt: "2026-09-01T08:00:00.000Z" }],
       settings: { theme: "system", soundEnabled: true, hapticEnabled: true },
+      profile: { name: "", avatar: "" },
+      trophyCase: { background: "classic", items: [] },
     };
     const ops = legacyToOps(legacy, "device-1");
     expect(ops.map((op) => op.id)).toEqual(["legacy-session-ok"]);

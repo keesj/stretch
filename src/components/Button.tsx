@@ -1,6 +1,6 @@
 import React from "react";
 
-type ButtonVariant = "primary" | "secondary" | "outline";
+type ButtonVariant = "primary" | "secondary" | "outline" | "ghost";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -22,6 +22,11 @@ export function Button({
       "bg-calm-200 text-calm-800 hover:bg-calm-300 active:bg-calm-400",
     outline:
       "border-2 border-primary-600 text-primary-600 hover:bg-primary-50 active:bg-primary-100 dark:border-primary-400 dark:text-primary-400 dark:hover:bg-primary-900/30",
+    // No fill: for controls that sit over scrolling content (e.g. the
+    // session's back button) where a solid background patch would stand
+    // out. Same shape and touch target as the other variants.
+    ghost:
+      "bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60 active:bg-gray-200 dark:active:bg-gray-700",
   };
 
   return (

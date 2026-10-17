@@ -2,11 +2,20 @@ import { makeHlc, maxHlc } from "./hlc";
 import { getDeviceId, getToken } from "./identity";
 import { appendOps, freezeLegacyIfNeeded, loadJournal, projectWith } from "./journal";
 import { replayOps } from "./replay";
-import type { LegacyBase, Op, EntityKind, OpKind } from "./types";
+import {
+  MAX_ITEMS,
+  type LegacyBase,
+  type Op,
+  type EntityKind,
+  type OpKind,
+  type PlacedItem,
+  type Profile,
+  type TrophyCaseState,
+} from "./types";
 import { newUuid } from "../utils/uuid";
 import { useSyncStore } from "./useSyncStore";
 import { toKey } from "../utils/challenge";
-import type { PlankChallengeState } from "../types/challenge";
+import type { Challenge, PlankChallengeState } from "../types/challenge";
 import type { CompletedSession, Settings } from "../utils/storage";
 
 /**
@@ -50,36 +59,64 @@ function mutate(
   return projectWith(merged, legacy);
 }
 
-/** Start the plank challenge (challenge op). Returns the new plank state. */
-export function recordChallengeStart(now: Date = new Date()): PlankChallengeState {
+/**
+ * The effective state of a challenge: the projection plus, for cohort
+ * challenges without a start op yet, the start date from their config.
+ */
+function stateFor(
+  state: ReturnType<typeof replayOps>,
+  challenge: Challenge
+): PlankChallengeState {
+  const projected = state.challenges[challenge.syncId] ?? { startedAt: null, days: [] };
+  return {
+    startedAt: projected.startedAt ?? challenge.startDate ?? null,
+    days: projected.days,
+  };
+}
+
+/** Start a self-start challenge (challenge op). Returns the new state. */
+export function recordChallengeStart(
+  challenge: Challenge,
+  now: Date = new Date()
+): PlankChallengeState {
+  const syncId = challenge.syncId;
   const state = mutate((_legacy, _journal, lastHlc) => [
-    nextOp("challenge", "plank", "create", { startedAt: toKey(now) }, lastHlc),
+    nextOp("challenge", syncId, "create", { startedAt: toKey(now) }, lastHlc),
   ]);
   scheduleSync();
-  return state.plank;
+  return stateFor(state, challenge);
 }
 
 /**
- * Record a plank hold for `now`'s date. If the challenge has no start
- * date yet, one is recorded too (first completion starts the challenge,
- * matching the pre-sync behavior). Returns the new plank state.
+ * Record a hold for `now`'s date in the given challenge. Self-start
+ * challenges without a start date yet get one recorded too (first
+ * completion starts the challenge, matching the pre-sync behavior);
+ * cohort challenges derive their start date from their config, so no
+ * start op is needed. Returns the new challenge state.
  */
-export function recordPlankDay(seconds: number, now: Date = new Date()): PlankChallengeState {
+export function recordPlankDay(
+  challenge: Challenge,
+  seconds: number,
+  now: Date = new Date()
+): PlankChallengeState {
+  const syncId = challenge.syncId;
   const date = toKey(now);
   const state = mutate((legacy, journal, lastHlc) => {
     const current = replayOps(legacy, journal);
     let last = lastHlc;
     const newOps: Op[] = [];
-    if (!current.plank.startedAt) {
-      const startOp = nextOp("challenge", "plank", "create", { startedAt: date }, last);
+    if (!challenge.startDate && !current.challenges[syncId]?.startedAt) {
+      const startOp = nextOp("challenge", syncId, "create", { startedAt: date }, last);
       newOps.push(startOp);
       last = startOp.hlc;
     }
-    newOps.push(nextOp("plankDay", date, "create", { seconds }, last));
+    newOps.push(
+      nextOp("plankDay", date, "create", { seconds, challengeId: syncId }, last)
+    );
     return newOps;
   });
   scheduleSync();
-  return state.plank;
+  return stateFor(state, challenge);
 }
 
 /** Record a completed routine session. Returns the new session list. */
@@ -120,13 +157,68 @@ export function patchSettings(patch: Partial<Settings>): Settings {
 }
 
 /**
- * Reset progress: a reset op clears plank and sessions on every device
- * that syncs it (settings survive). Returns the projected state.
+ * Update the display identity (profile patch op, last-write-wins per
+ * field). Only the provided fields are written; an empty string clears
+ * the field back to the default (anonymous / no avatar). Returns the new
+ * profile.
  */
-export function resetProgress(): { plank: PlankChallengeState; sessions: CompletedSession[] } {
+export function recordProfile(patch: Partial<Profile>): Profile {
+  const data: Record<string, unknown> = {};
+  if (patch.name !== undefined) data.name = patch.name.slice(0, 24);
+  if (patch.avatar !== undefined) data.avatar = patch.avatar.slice(0, 8);
+  if (Object.keys(data).length === 0) {
+    const legacy = freezeLegacyIfNeeded();
+    return replayOps(legacy, loadJournal()).profile;
+  }
+  const state = mutate((_legacy, _journal, lastHlc) => [
+    nextOp("profile", "me", "patch", data, lastHlc),
+  ]);
+  scheduleSync();
+  return state.profile;
+}
+
+function clampPct(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 50;
+}
+
+/**
+ * Decorate the trophy chamber (trophyCase op, last-write-wins per field):
+ * the background theme and the placed items (free positions, overlap
+ * allowed). The UI only ever offers earned trophies and the curated free
+ * items; unknown ids are kept but never render. Returns the projected
+ * trophy case.
+ */
+export function recordTrophyCase(patch: Partial<TrophyCaseState>): TrophyCaseState {
+  const data: Record<string, unknown> = {};
+  if (patch.background !== undefined) data.background = patch.background.slice(0, 24);
+  if (patch.items !== undefined) {
+    data.items = patch.items.slice(0, MAX_ITEMS).map<PlacedItem>((it) => ({
+      item: String(it.item).slice(0, 24),
+      x: clampPct(it.x),
+      y: clampPct(it.y),
+      size: it.size === 2 ? 2 : 1,
+    }));
+  }
+  if (Object.keys(data).length === 0) {
+    const legacy = freezeLegacyIfNeeded();
+    return replayOps(legacy, loadJournal()).trophyCase;
+  }
+  const state = mutate((_legacy, _journal, lastHlc) => [
+    nextOp("trophyCase", "me", "patch", data, lastHlc),
+  ]);
+  scheduleSync();
+  return state.trophyCase;
+}
+
+/**
+ * Reset progress: a reset op clears every challenge and the sessions on
+ * all devices that sync it (settings, profile, and the trophy case
+ * survive). Returns the projected state.
+ */
+export function resetProgress(): ReturnType<typeof replayOps> {
   const state = mutate((_legacy, _journal, lastHlc) => [
     nextOp("reset", "all", "create", undefined, lastHlc),
   ]);
   scheduleSync();
-  return { plank: state.plank, sessions: state.sessions };
+  return state;
 }

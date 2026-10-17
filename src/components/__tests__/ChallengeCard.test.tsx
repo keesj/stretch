@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChallengeCard } from '../ChallengeCard';
@@ -6,6 +6,8 @@ import type { Challenge, ChallengeStatus } from '../../types/challenge';
 
 const challenge: Challenge = {
   id: 'plank-30-day',
+  syncId: 'plank',
+  scoring: 'threshold',
   title: '30-Day Plank Challenge',
   description: 'Hold a 2-minute plank every day for 30 days.',
   exerciseId: 'plank-hold',
@@ -17,6 +19,23 @@ const challenge: Challenge = {
   milestoneSeconds: 180,
   milestonePoints: 2,
   illustration: '💪',
+};
+
+const maxChallenge: Challenge = {
+  id: 'plank-max-30-day',
+  syncId: 'plank-max',
+  scoring: 'duration',
+  title: '30-Day Max Plank Challenge',
+  description: 'Plank once a day and hold as long as you can.',
+  exerciseId: 'plank-hold',
+  totalDays: 30,
+  startDate: '2026-11-01',
+  baseSeconds: 120,
+  basePoints: 1,
+  incrementSeconds: 30,
+  incrementPoints: 0.5,
+  maxSeconds: 600,
+  illustration: '⏱️',
 };
 
 function mkStatus(overrides: Partial<ChallengeStatus> = {}): ChallengeStatus {
@@ -166,5 +185,72 @@ describe('ChallengeCard', () => {
 
     const bar = document.querySelector('[style*="width: 50%"]');
     expect(bar).toBeInTheDocument();
+  });
+
+  describe('cohort (duration) challenge', () => {
+    // The cohort opens on 2026-11-01; pin the clock to October so the
+    // "opens" state is deterministic.
+    beforeEach(() => {
+      vi.setSystemTime(new Date(2026, 9, 10, 12));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('shows the open date and stays locked before the cohort starts', () => {
+      render(
+        <ChallengeCard
+          challenge={maxChallenge}
+          status={mkStatus({ status: 'not-started', dayNumber: 1, daysLeft: 30, score: 0, missedDays: 0 })}
+          onStart={vi.fn()}
+          onBegin={vi.fn()}
+          onRestart={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('30 days • hold as long as you can')).toBeInTheDocument();
+      const button = screen.getByText('Opens November 1');
+      expect(button).toBeDisabled();
+    });
+
+    it('prefers the account start op over the configured date', () => {
+      localStorage.setItem(
+        'challenge:plank-max',
+        JSON.stringify({ startedAt: '2026-12-01', days: [] })
+      );
+      try {
+        render(
+          <ChallengeCard
+            challenge={maxChallenge}
+            status={mkStatus({ status: 'not-started', dayNumber: 1, daysLeft: 30, score: 0, missedDays: 0 })}
+            onStart={vi.fn()}
+            onBegin={vi.fn()}
+            onRestart={vi.fn()}
+          />
+        );
+
+        // The account's Dec 1 op (pushed by the admin CLI) wins over the
+        // configured Nov 1.
+        expect(screen.getByText('Opens December 1')).toBeInTheDocument();
+      } finally {
+        localStorage.removeItem('challenge:plank-max');
+      }
+    });
+
+    it('offers no restart when a cohort challenge is complete', () => {
+      render(
+        <ChallengeCard
+          challenge={maxChallenge}
+          status={mkStatus({ status: 'complete', dayNumber: 30, daysLeft: 0, score: 120 })}
+          onStart={vi.fn()}
+          onBegin={vi.fn()}
+          onRestart={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Finished')).toBeDisabled();
+      expect(screen.queryByText('Start New Challenge')).not.toBeInTheDocument();
+    });
   });
 });

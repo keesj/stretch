@@ -4,7 +4,14 @@ export type StorageKey =
   | "lastSessionDate"
   | "settings"
   | "activeSession"
-  | "plankChallenge";
+  // Legacy blob of the original self-start challenge (syncId "plank");
+  // every other challenge projects to `challenge:<syncId>`.
+  | "plankChallenge"
+  | `challenge:${string}`
+  // Display identity for the squad views (name + avatar).
+  | "stretch.profile"
+  // Trophy chamber decoration (background + shelf layout).
+  | "stretch.trophyCase";
 
 export interface Settings {
   theme: "light" | "dark" | "system";

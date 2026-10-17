@@ -1,4 +1,4 @@
-import type { InvalidOp, Op } from "./types";
+import type { InvalidOp, Op, StandingsFeed, Squad } from "./types";
 import { getToken, type SyncRole } from "./identity";
 
 export interface PushResult {
@@ -135,5 +135,54 @@ export function revokeOtherTokens(baseUrl = ""): Promise<{ ok: boolean; revoked:
 
 /** Sign out this device: revoke its own token. The journal is unaffected. */
 export function revokeSelf(baseUrl = ""): Promise<{ ok: boolean }> {
-  return post<{ ok: boolean }>("/api/sync/token/revoke-self", {}, { baseUrl });
+  return post("/api/sync/token/revoke-self", {}, { baseUrl });
+}
+
+/**
+ * One read-only request. Same auth and error mapping as `post`, for the
+ * social endpoints.
+ */
+async function get<T>(path: string, { baseUrl = "" }: { baseUrl?: string } = {}): Promise<T> {
+  const headers: { "Content-Type": string; Authorization?: string } = {
+    "Content-Type": "application/json",
+  };
+  const token = getToken();
+  if (!token) throw new Error("This device is not linked to a sync account");
+  headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${baseUrl}${path}`, { method: "GET", headers });
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null)) as { error?: string } | null;
+    const message =
+      res.status === 401
+        ? "Token invalid or revoked — sign out and link this device again"
+        : detail?.error ?? `sync ${path} failed (${res.status})`;
+    throw new SyncError(res.status, message);
+  }
+  return res.json() as Promise<T>;
+}
+
+/**
+ * The squads this device's account belongs to (managed server-side via
+ * the admin CLI). Drives the Squad/Chamber tab visibility and the
+ * standings squad selector.
+ */
+export function fetchSquads(baseUrl = ""): Promise<Squad[]> {
+  return get<{ squads: Squad[] }>("/api/social/squads", { baseUrl }).then((res) => res.squads);
+}
+
+/**
+ * One squad's standings feed for a challenge: every member's profile plus
+ * raw best holds per day, with today and the future withheld (the
+ * quiet-day rule — the reveal is the next day's). Only squad members can
+ * read the feed.
+ */
+export function fetchStandings(
+  challengeId: string,
+  squadId: string,
+  baseUrl = ""
+): Promise<StandingsFeed> {
+  return get<StandingsFeed>(
+    `/api/social/standings?challenge=${encodeURIComponent(challengeId)}&squad=${encodeURIComponent(squadId)}`,
+    { baseUrl }
+  );
 }

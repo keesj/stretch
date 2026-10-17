@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import type { Routine } from "../types/routine";
@@ -12,17 +12,16 @@ import {
   type CompletedSession,
 } from "../utils/storage";
 import {
-  loadPlankState,
-  startPlankChallenge,
+  activeChallenge,
+  loadChallengeState,
+  startChallenge,
   getChallengeStatus,
+  challengeBlobKey,
 } from "../utils/challenge";
-import type { Challenge, PlankChallengeState } from "../types/challenge";
+import type { PlankChallengeState } from "../types/challenge";
 
 import routinesData from "../data/routines.json";
 import stretchesData from "../data/stretches.json";
-import challengesData from "../data/challenges.json";
-
-const challenges = challengesData as Challenge[];
 
 export function Home() {
   const navigate = useNavigate();
@@ -31,12 +30,13 @@ export function Home() {
   const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const completedSessionsRef = useRef<CompletedSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const plankChallenge = useMemo(() => activeChallenge(), []);
   const [plankState, setPlankState] = useState<PlankChallengeState>(() =>
-    loadPlankState()
+    loadChallengeState(plankChallenge)
   );
 
-  const plankChallenge = challenges[0];
   const plankStatus = getChallengeStatus(plankChallenge, plankState);
+  const challengeBlob = challengeBlobKey(plankChallenge.syncId);
 
   useEffect(() => {
     const loadSessions = () => {
@@ -56,14 +56,14 @@ export function Home() {
       if (e.key === "completedSessions") {
         loadSessions();
       }
-      if (e.key === "plankChallenge") {
-        setPlankState(loadPlankState());
+      if (e.key === challengeBlob) {
+        setPlankState(loadChallengeState(plankChallenge));
       }
     };
     // Fired after a sync round absorbs remote ops (same tab).
     const handleDataRefresh = () => {
       loadSessions();
-      setPlankState(loadPlankState());
+      setPlankState(loadChallengeState(plankChallenge));
     };
 
     try {
@@ -77,7 +77,7 @@ export function Home() {
         window.removeEventListener("stretch:data", handleDataRefresh);
       } catch { /* cleanup failed */ }
     };
-  }, []);
+  }, [challengeBlob, plankChallenge]);
 
   if (isLoading) {
     return (
@@ -103,7 +103,7 @@ export function Home() {
   const otherRoutines = routines.slice(1);
 
   const handleStartChallenge = () => {
-    setPlankState(startPlankChallenge());
+    setPlankState(startChallenge(plankChallenge));
     navigate("/challenge");
   };
 
@@ -116,7 +116,7 @@ export function Home() {
       typeof confirm === "function" &&
       confirm("Start a new 30-day challenge? Your current progress will be lost.")
     ) {
-      setPlankState(startPlankChallenge());
+      setPlankState(startChallenge(plankChallenge));
       navigate("/challenge");
     }
   };

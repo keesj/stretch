@@ -4,16 +4,19 @@ import {
   getMonthBuckets,
   getOverallTotals,
   getYearBuckets,
+  type ChallengeEntry,
 } from "../progress";
 import type { Challenge, PlankChallengeState } from "../../types/challenge";
 import type { CompletedSession } from "../storage";
 
 const challenge: Challenge = {
   id: "plank-30-day",
+  syncId: "plank",
   title: "30-Day Plank Challenge",
   description: "test",
   exerciseId: "plank-hold",
   totalDays: 30,
+  scoring: "threshold",
   baseSeconds: 120,
   bonusSeconds: 30,
   bonusPoints: 0.5,
@@ -22,6 +25,30 @@ const challenge: Challenge = {
   milestonePoints: 2,
   illustration: "💪",
 };
+
+const durationChallenge: Challenge = {
+  id: "plank-max-30-day",
+  syncId: "plank-max",
+  title: "30-Day Plank Max Challenge",
+  description: "test",
+  exerciseId: "plank-hold",
+  totalDays: 30,
+  startDate: "2026-11-01",
+  scoring: "duration",
+  baseSeconds: 120,
+  basePoints: 1,
+  incrementSeconds: 30,
+  incrementPoints: 0.5,
+  maxSeconds: 600,
+  illustration: "⏱️",
+};
+
+function entries(...states: PlankChallengeState[]): ChallengeEntry[] {
+  return [
+    { challenge, state: states[0] ?? { startedAt: null, days: [] } },
+    ...(states[1] ? [{ challenge: durationChallenge, state: states[1] }] : []),
+  ];
+}
 
 function session(routineId: string, date: Date): CompletedSession {
   return {
@@ -45,15 +72,31 @@ describe("getDailyPoints", () => {
       session("b", new Date(2026, 2, 2, 12)), // second routine: +1
     ];
 
-    expect(getDailyPoints(challenge, state, sessions, "2026-03-02")).toEqual({
+    expect(getDailyPoints(entries(state), sessions, "2026-03-02")).toEqual({
       plank: 1,
       routine: 2,
       total: 3,
     });
-    expect(getDailyPoints(challenge, state, sessions, "2026-03-03")).toEqual({
+    expect(getDailyPoints(entries(state), sessions, "2026-03-03")).toEqual({
       plank: 0,
       routine: 0,
       total: 0,
+    });
+  });
+
+  it("sums holds from different challenges on the same date", () => {
+    const stateA: PlankChallengeState = {
+      startedAt: "2026-03-01",
+      days: [{ date: "2026-03-01", seconds: 120 }], // +1
+    };
+    const stateB: PlankChallengeState = {
+      startedAt: "2026-03-01",
+      days: [{ date: "2026-03-01", seconds: 180 }], // 1 + 2x0.5 = +2
+    };
+    expect(getDailyPoints(entries(stateA, stateB), [], "2026-03-01")).toEqual({
+      plank: 3,
+      routine: 0,
+      total: 3,
     });
   });
 });
@@ -74,10 +117,25 @@ describe("getOverallTotals", () => {
       session("b", new Date(2026, 2, 3, 8)),
     ];
 
-    expect(getOverallTotals(challenge, state, sessions)).toEqual({
+    expect(getOverallTotals(entries(state), sessions)).toEqual({
       plank: 2.5,
       routine: 2,
       total: 4.5,
+    });
+  });
+
+  it("adds the duration challenge's capped points to the all-time total", () => {
+    const stateB: PlankChallengeState = {
+      startedAt: "2026-11-01",
+      days: [
+        { date: "2026-11-01", seconds: 600 }, // capped at 9
+        { date: "2026-11-02", seconds: 60 }, // +0 (below base)
+      ],
+    };
+    expect(getOverallTotals(entries({ startedAt: null, days: [] }, stateB), [])).toEqual({
+      plank: 9,
+      routine: 0,
+      total: 9,
     });
   });
 
@@ -89,9 +147,11 @@ describe("getOverallTotals", () => {
       duration: 10,
       completedAt: "not-a-date",
     };
-    expect(getOverallTotals(challenge, { startedAt: null, days: [] }, [bad])).toEqual(
-      { plank: 0, routine: 0, total: 0 }
-    );
+    expect(getOverallTotals(entries(), [bad])).toEqual({
+      plank: 0,
+      routine: 0,
+      total: 0,
+    });
   });
 });
 
@@ -107,8 +167,7 @@ describe("getMonthBuckets", () => {
     ];
 
     const bars = getMonthBuckets(
-      challenge,
-      state,
+      entries(state),
       sessions,
       2026,
       1,
@@ -122,13 +181,7 @@ describe("getMonthBuckets", () => {
   });
 
   it("returns 31 bars for a 31-day month", () => {
-    const bars = getMonthBuckets(
-      challenge,
-      { startedAt: null, days: [] },
-      [],
-      2026,
-      7
-    );
+    const bars = getMonthBuckets(entries(), [], 2026, 7);
     expect(bars).toHaveLength(31);
   });
 });
@@ -145,7 +198,7 @@ describe("getYearBuckets", () => {
     };
     const sessions = [session("a", new Date(2026, 0, 9, 8))]; // Friday Jan 9
 
-    const bars = getYearBuckets(challenge, state, sessions, 2026);
+    const bars = getYearBuckets(entries(state), sessions, 2026);
 
     expect(bars).toHaveLength(53);
     expect(bars[0]).toMatchObject({
@@ -179,17 +232,17 @@ describe("milestone days", () => {
       ],
     };
 
-    expect(getDailyPoints(challenge, state, [], "2026-03-10")).toEqual({
+    expect(getDailyPoints(entries(state), [], "2026-03-10")).toEqual({
       plank: 2,
       routine: 0,
       total: 2,
     });
-    expect(getDailyPoints(challenge, state, [], "2026-03-11")).toEqual({
+    expect(getDailyPoints(entries(state), [], "2026-03-11")).toEqual({
       plank: 1,
       routine: 0,
       total: 1,
     });
-    expect(getOverallTotals(challenge, state, [])).toEqual({
+    expect(getOverallTotals(entries(state), [])).toEqual({
       plank: 3,
       routine: 0,
       total: 3,
@@ -201,12 +254,12 @@ describe("milestone days", () => {
       startedAt: "2026-03-01",
       days: [{ date: "2026-03-10", seconds: 120 }],
     };
-    expect(getDailyPoints(challenge, state, [], "2026-03-10")).toEqual({
+    expect(getDailyPoints(entries(state), [], "2026-03-10")).toEqual({
       plank: 1,
       routine: 0,
       total: 1,
     });
-    expect(getOverallTotals(challenge, state, [])).toEqual({
+    expect(getOverallTotals(entries(state), [])).toEqual({
       plank: 1,
       routine: 0,
       total: 1,

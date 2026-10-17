@@ -28,6 +28,12 @@ function daysAgoKey(days) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function dateKeyFromNow(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 let opSeq = 0;
 function makeOp(overrides = {}) {
   opSeq += 1;
@@ -217,6 +223,37 @@ describe('/api/sync/push', () => {
       { ops: [makeOp({ entity: 'challenge', entityId: 'plank', data: { startedAt: future } })] }
     );
     expect(bad.status).toBe(400);
+  });
+
+  test('plankDay ops can target a known challenge, not an unknown one', async () => {
+    const ok = await post(
+      '/api/sync/push',
+      { ops: [makeOp({ data: { seconds: 150, challengeId: 'plank-max' } })] }
+    );
+    expect(ok.status).toBe(200);
+
+    const bad = await post(
+      '/api/sync/push',
+      { ops: [makeOp({ data: { seconds: 150, challengeId: 'warp' } })] }
+    );
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toContain('challengeId');
+  });
+
+  test('a cohort challenge may open in the future, within the bound', async () => {
+    const ok = await post(
+      '/api/sync/push',
+      { ops: [makeOp({ entity: 'challenge', entityId: 'plank-max', data: { startedAt: dateKeyFromNow(5) } })] }
+    );
+    expect(ok.status).toBe(200);
+
+    // Farther out than the 60-day bound: rejected even for a cohort.
+    const tooFar = await post(
+      '/api/sync/push',
+      { ops: [makeOp({ entity: 'challenge', entityId: 'plank-max', data: { startedAt: dateKeyFromNow(90) } })] }
+    );
+    expect(tooFar.status).toBe(400);
+    expect(tooFar.body.error).toContain('future');
   });
 
   test('accepts a session op and rejects implausible ones', async () => {
@@ -422,6 +459,302 @@ describe('error responses', () => {
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('request body too large');
+  });
+});
+
+describe('trophyCase ops', () => {
+  const caseOp = (overrides = {}) =>
+    makeOp({ entity: 'trophyCase', entityId: 'me', kind: 'patch', ...overrides });
+
+  test('accepts a background + free-position items patch (overlap allowed)', async () => {
+    const items = [
+      { item: 'first-plank', x: 10, y: 20 },
+      { item: 'gem', x: 11, y: 21 } // deliberately overlapping the trophy
+    ];
+    const { status } = await post('/api/sync/push', {
+      ops: [caseOp({ data: { background: 'midnight', items } })]
+    });
+    expect(status).toBe(200);
+  });
+
+  test('accepts an empty items list (clears the shelf)', async () => {
+    const { status } = await post('/api/sync/push', { ops: [caseOp({ data: { items: [] } })] });
+    expect(status).toBe(200);
+  });
+
+  test('accepts the legacy slots shapes (replay normalizes them)', async () => {
+    const grid = Array.from({ length: 16 }, (_, i) => (i === 1 ? 'first-plank' : i === 8 ? 'gem' : null));
+    const legacyGrid = await post('/api/sync/push', { ops: [caseOp({ data: { slots: grid } })] });
+    expect(legacyGrid.status).toBe(200);
+    const legacyCompact = await post('/api/sync/push', { ops: [caseOp({ data: { slots: ['first-plank', 'on-fire'] } })] });
+    expect(legacyCompact.status).toBe(200);
+  });
+
+  test('rejects unknown fields', async () => {
+    const { status, body } = await post('/api/sync/push', {
+      ops: [caseOp({ data: { background: 'midnight', theme: 'dark' } })]
+    });
+    expect(status).toBe(400);
+    expect(body.error).toContain('unknown trophyCase field');
+  });
+
+  test('rejects more than 24 items and out-of-range positions', async () => {
+    const twentyFive = Array.from({ length: 25 }, () => ({ item: 'gem', x: 50, y: 50 }));
+    const tooMany = await post('/api/sync/push', { ops: [caseOp({ data: { items: twentyFive } })] });
+    expect(tooMany.status).toBe(400);
+    expect(tooMany.body.error).toContain('max 24');
+    const offShelf = await post('/api/sync/push', { ops: [caseOp({ data: { items: [{ item: 'gem', x: 101, y: 50 }] } })] });
+    expect(offShelf.status).toBe(400);
+    expect(offShelf.body.error).toContain('0-100');
+  });
+
+  test('accepts grown items (size 2) and rejects other sizes', async () => {
+    const grown = await post('/api/sync/push', {
+      ops: [caseOp({ data: { items: [{ item: 'gem', x: 50, y: 50, size: 2 }] } })]
+    });
+    expect(grown.status).toBe(200);
+    const legacy = await post('/api/sync/push', {
+      ops: [caseOp({ data: { items: [{ item: 'gem', x: 50, y: 50 }] } })]
+    });
+    expect(legacy.status).toBe(200);
+    const triple = await post('/api/sync/push', {
+      ops: [caseOp({ data: { items: [{ item: 'gem', x: 50, y: 50, size: 3 }] } })]
+    });
+    expect(triple.status).toBe(400);
+    expect(triple.body.error).toContain('size must be 1 or 2');
+    const text = await post('/api/sync/push', {
+      ops: [caseOp({ data: { items: [{ item: 'gem', x: 50, y: 50, size: '2' }] } })]
+    });
+    expect(text.status).toBe(400);
+  });
+
+  test('rejects malformed items and bad backgrounds', async () => {
+    const notAnObject = await post('/api/sync/push', { ops: [caseOp({ data: { items: ['gem'] } })] });
+    expect(notAnObject.status).toBe(400);
+    const badItem = await post('/api/sync/push', { ops: [caseOp({ data: { items: [{ item: '', x: 50, y: 50 }] } })] });
+    expect(badItem.status).toBe(400);
+    const badPos = await post('/api/sync/push', { ops: [caseOp({ data: { items: [{ item: 'gem', x: 'half', y: 50 }] } })] });
+    expect(badPos.status).toBe(400);
+    const badBg = await post('/api/sync/push', { ops: [caseOp({ data: { background: 42 } })] });
+    expect(badBg.status).toBe(400);
+  });
+
+  test('rejects a create kind and a wrong entity id', async () => {
+    const kind = await post('/api/sync/push', { ops: [caseOp({ kind: 'create', data: { background: 'x' } })] });
+    expect(kind.status).toBe(400);
+    const id = await post('/api/sync/push', { ops: [caseOp({ entityId: 'nope', data: { background: 'x' } })] });
+    expect(id.status).toBe(400);
+  });
+});
+
+describe('/api/social/squads', () => {
+  test('rejects a request without a token', async () => {
+    const res = await fetch(`${base}/api/social/squads`);
+    expect(res.status).toBe(401);
+  });
+
+  test('returns only the caller\'s squads', async () => {
+    const mine = db.createSquad('Api Squad');
+    db.addSquadMember(mine.id, USER_ID);
+    const notMine = db.createSquad('Not Mine');
+    db.addSquadMember(notMine.id, PAIR_ID);
+
+    const res = await fetch(`${base}/api/social/squads`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).squads).toEqual([{ id: mine.id, name: 'Api Squad' }]);
+
+    // Clean up so the standings suite starts from a quiet server.
+    db.removeSquadMember(mine.id, USER_ID);
+    db.deleteSquad(mine.id);
+    db.deleteSquad(notMine.id);
+  });
+});
+
+describe('/api/social/standings', () => {
+  const SOLO_A = '33333333-2222-4333-8444-555555555555';
+  const SOLO_B = '44444444-2222-4333-8444-555555555555';
+  const SOLO_C = '66666666-2222-4333-8444-555555555555';
+  let tokenA;
+  let tokenB;
+  let tokenC;
+  let squadA;
+
+  const get = (path, authToken) =>
+    fetch(`${base}${path}`, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined
+    });
+
+  const standings = (authToken, challenge = 'plank-max', squad = squadA) =>
+    get(`/api/social/standings?challenge=${challenge}&squad=${squad?.id ?? ''}`, authToken);
+
+  beforeAll(async () => {
+    for (const [id, slot] of [[SOLO_A, 'a'], [SOLO_B, 'b'], [SOLO_C, 'c']]) {
+      const res = await post('/api/sync/bootstrap', { accountId: id, label: `standings ${slot}` }, null);
+      expect(res.status).toBe(200);
+      if (slot === 'a') tokenA = res.body.token;
+      else if (slot === 'b') tokenB = res.body.token;
+      else tokenC = res.body.token;
+    }
+    // A + B share one squad; C sits in a squad of its own (the outsider).
+    squadA = db.createSquad('Alphas');
+    db.addSquadMember(squadA.id, SOLO_A);
+    db.addSquadMember(squadA.id, SOLO_B);
+    const squadC = db.createSquad('Gammas');
+    db.addSquadMember(squadC.id, SOLO_C);
+  });
+
+  test('rejects a request without a token', async () => {
+    const res = await get(`/api/social/standings?challenge=plank-max&squad=${squadA.id}`);
+    expect(res.status).toBe(401);
+  });
+
+  test('rejects an unknown challenge', async () => {
+    const res = await get(`/api/social/standings?challenge=nope&squad=${squadA.id}`, tokenA);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain('challenge');
+  });
+
+  test('requires a squad and a membership in it', async () => {
+    const missing = await get('/api/social/standings?challenge=plank-max', tokenA);
+    expect(missing.status).toBe(400);
+    expect((await missing.json()).error).toContain('squad');
+
+    const outsiders = db.createSquad('Outsiders');
+    const stranger = await get(`/api/social/standings?challenge=plank-max&squad=${outsiders.id}`, tokenA);
+    expect(stranger.status).toBe(403);
+    expect((await stranger.json()).error).toContain('member');
+    db.deleteSquad(outsiders.id);
+  });
+
+  test('returns the group roster with profile, start, and best holds per day', async () => {
+    const now = Date.now();
+    const ops = [
+      // Profile: two name writes (last wins), one avatar write.
+      makeOp({
+        id: 'stand-a-name1', hlc: hlcFor(now - 2000, 'standa01'), device: 'standa01',
+        entity: 'profile', entityId: 'me', kind: 'patch', data: { name: 'Ana' }
+      }),
+      makeOp({
+        id: 'stand-a-avatar', hlc: hlcFor(now - 1500, 'standa02'), device: 'standa02',
+        entity: 'profile', entityId: 'me', kind: 'patch', data: { avatar: '🐢' }
+      }),
+      makeOp({
+        id: 'stand-a-name2', hlc: hlcFor(now - 1000, 'standa03'), device: 'standa03',
+        entity: 'profile', entityId: 'me', kind: 'patch', data: { name: 'Anika' }
+      }),
+      // Cohort start (an account op overriding the config date).
+      makeOp({
+        id: 'stand-a-start', hlc: hlcFor(now - 900, 'standa04'), device: 'standa04',
+        entity: 'challenge', entityId: 'plank-max', kind: 'create',
+        data: { startedAt: daysAgoKey(10) }
+      }),
+      // Best hold per day: two ops the same day (max wins), one yesterday,
+      // one today (today must be withheld), and a legacy-day (other challenge).
+      makeOp({
+        id: 'stand-a-day-weak', hlc: hlcFor(now - 800, 'standa05'), device: 'standa05',
+        entityId: daysAgoKey(2), data: { seconds: 90, challengeId: 'plank-max' }
+      }),
+      makeOp({
+        id: 'stand-a-day-strong', hlc: hlcFor(now - 700, 'standa06'), device: 'standa06',
+        entityId: daysAgoKey(2), data: { seconds: 200, challengeId: 'plank-max' }
+      }),
+      makeOp({
+        id: 'stand-a-day-yesterday', hlc: hlcFor(now - 600, 'standa07'), device: 'standa07',
+        entityId: daysAgoKey(1), data: { seconds: 120, challengeId: 'plank-max' }
+      }),
+      makeOp({
+        id: 'stand-a-day-today', hlc: hlcFor(now - 500, 'standa08'), device: 'standa08',
+        entityId: todayKey(), data: { seconds: 400, challengeId: 'plank-max' }
+      }),
+      makeOp({
+        id: 'stand-a-day-legacy', hlc: hlcFor(now - 400, 'standa09'), device: 'standa09',
+        entityId: daysAgoKey(1), data: { seconds: 60 }
+      })
+    ];
+    const push = await post('/api/sync/push', { ops }, tokenA);
+    expect(push.status).toBe(200);
+
+    const res = await standings(tokenA);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.asOf).toBe(todayKey());
+    const me = body.roster.find((r) => r.accountId === SOLO_A);
+    expect(me).toEqual({
+      accountId: SOLO_A,
+      name: 'Anika',
+      avatar: '🐢',
+      startedAt: daysAgoKey(10),
+      days: [
+        { date: daysAgoKey(2), seconds: 200 },
+        { date: daysAgoKey(1), seconds: 120 }
+      ]
+    });
+  });
+
+  test('scopes the roster to the squad (other squads stay invisible)', async () => {
+    const now = Date.now();
+    const push = await post(
+      '/api/sync/push',
+      {
+        ops: [
+          makeOp({
+            id: 'stand-c-day',
+            hlc: hlcFor(now - 100, 'standc01'),
+            device: 'standc01',
+            entityId: daysAgoKey(1),
+            data: { seconds: 500, challengeId: 'plank-max' }
+          })
+        ]
+      },
+      tokenC
+    );
+    expect(push.status).toBe(200);
+
+    // C has plenty of data, but it lives in another squad.
+    const res = await standings(tokenA);
+    const body = await res.json();
+    const ids = body.roster.map((r) => r.accountId);
+    expect(ids).toContain(SOLO_A);
+    expect(ids).not.toContain(SOLO_C);
+
+    // …and from C's own squad the roster is just C.
+    const resC = await standings(tokenC, 'plank-max', { id: db.listSquads().find((s) => s.members.includes(SOLO_C)).id });
+    const bodyC = await resC.json();
+    expect(bodyC.roster.map((r) => r.accountId)).toEqual([SOLO_C]);
+  });
+
+  test('withholds today and the future (the quiet-day rule)', async () => {
+    // tokenA already has a plankDay for today (pushed above) — it must not
+    // appear in the feed for either account.
+    const resA = await standings(tokenA);
+    const resB = await standings(tokenB);
+    for (const res of [resA, resB]) {
+      const body = await res.json();
+      for (const member of body.roster) {
+        for (const day of member.days) {
+          expect(day.date < body.asOf).toBe(true);
+        }
+      }
+    }
+  });
+
+  test('legacy plank days show in the legacy feed, not the cohort feed', async () => {
+    const res = await standings(tokenA, 'plank');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const me = body.roster.find((r) => r.accountId === SOLO_A);
+    expect(me.days).toEqual([{ date: daysAgoKey(1), seconds: 60 }]);
+    // And the same account is absent from the cohort feed's days list above
+    // (its only cohort day is daysAgoKey(1) at 120 s — the legacy 60 s must
+    // not leak into it).
+    const cohort = await (await standings(tokenA)).json();
+    const cohortMe = cohort.roster.find((r) => r.accountId === SOLO_A);
+    expect(cohortMe.days.find((d) => d.date === daysAgoKey(1))).toEqual({
+      date: daysAgoKey(1),
+      seconds: 120
+    });
   });
 });
 

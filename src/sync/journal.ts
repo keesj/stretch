@@ -1,5 +1,6 @@
 import { compareHlc } from "./hlc";
-import { replayOps, type ProjectedState } from "./replay";
+import { normalizeTrophyCaseState, replayOps, type ProjectedState } from "./replay";
+import { challengeBlobKey, DEFAULT_PROFILE, DEFAULT_TROPHY_CASE } from "./types";
 import type { LegacyBase, Op } from "./types";
 import {
   loadFromStorage,
@@ -67,12 +68,14 @@ function isPlausibleOp(v: unknown): v is Op {
 export function freezeLegacyIfNeeded(): LegacyBase {
   if (safeGet(MIGRATED_KEY) != null) return readLegacy();
   try {
-    if (safeGet(JOURNAL_KEY) == null) {
-      const legacy: LegacyBase = {
-        plank: readRawPlank(),
-        sessions: loadFromStorage<CompletedSession[]>("completedSessions", []),
-        settings: loadFromStorage<Settings>("settings", DEFAULT_SETTINGS),
-      };
+      if (safeGet(JOURNAL_KEY) == null) {
+        const legacy: LegacyBase = {
+          plank: readRawPlank(),
+          sessions: loadFromStorage<CompletedSession[]>("completedSessions", []),
+          settings: loadFromStorage<Settings>("settings", DEFAULT_SETTINGS),
+          profile: { ...DEFAULT_PROFILE },
+          trophyCase: { ...DEFAULT_TROPHY_CASE },
+        };
       safeSet(LEGACY_KEY, JSON.stringify(legacy));
       safeSet(MIGRATED_KEY, "1");
       return legacy;
@@ -107,12 +110,19 @@ function readRawPlank(): PlankChallengeState {
 export function readLegacy(): LegacyBase {
   const legacy = readJson<LegacyBase>(LEGACY_KEY);
   if (legacy && typeof legacy === "object" && legacy.plank && Array.isArray(legacy.sessions)) {
-    return legacy;
+    return {
+      ...legacy,
+      profile: { ...DEFAULT_PROFILE, ...legacy.profile },
+      // Older builds froze this base with the pre-canvas `slots` shape.
+      trophyCase: normalizeTrophyCaseState(legacy.trophyCase),
+    };
   }
   return {
     plank: { startedAt: null, days: [] },
     sessions: [],
     settings: { ...DEFAULT_SETTINGS },
+    profile: { ...DEFAULT_PROFILE },
+    trophyCase: { ...DEFAULT_TROPHY_CASE },
   };
 }
 
@@ -159,17 +169,22 @@ export function quarantineOps(ids: string[]): Op[] {
 
 /**
  * Replay legacy + `journal` into the app state and write the projection
- * blobs the rest of the app reads (plankChallenge / completedSessions /
- * settings). Returns the projected state. Callers pass the journal they
- * just built (appendOps' result) so the projection never depends on a
- * second store read.
+ * blobs the rest of the app reads (one per challenge — the legacy
+ * challenge keeps the historical "plankChallenge" key — plus
+ * completedSessions / settings). Returns the projected state. Callers
+ * pass the journal they just built (appendOps' result) so the projection
+ * never depends on a second store read.
  */
 export function projectWith(journal: Op[], legacy?: LegacyBase): ProjectedState {
   const base = legacy ?? freezeLegacyIfNeeded();
   const state = replayOps(base, journal);
-  safeSet("plankChallenge", JSON.stringify(state.plank));
+  for (const [syncId, challengeState] of Object.entries(state.challenges)) {
+    safeSet(challengeBlobKey(syncId), JSON.stringify(challengeState));
+  }
   safeSet("completedSessions", JSON.stringify(state.sessions));
   safeSet("settings", JSON.stringify(state.settings));
+  safeSet("stretch.profile", JSON.stringify(state.profile));
+  safeSet("stretch.trophyCase", JSON.stringify(state.trophyCase));
   return state;
 }
 

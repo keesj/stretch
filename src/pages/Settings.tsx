@@ -6,13 +6,19 @@ import { Button } from "../components/Button";
 import { SyncCard } from "../components/SyncCard";
 import { useTheme } from "../hooks/useTheme";
 import { loadFromStorage, DEFAULT_SETTINGS, type Settings, type CompletedSession } from "../utils/storage";
-import { patchSettings, resetProgress } from "../sync/record";
+import { patchSettings, recordProfile, resetProgress } from "../sync/record";
+import { DEFAULT_PROFILE, type Profile } from "../sync/types";
+import { AVATARS } from "../utils/display";
 
 export function Settings() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState<Settings>(() =>
     loadFromStorage("settings", DEFAULT_SETTINGS)
   );
+  const [profile, setProfile] = useState<Profile>(() =>
+    loadFromStorage("stretch.profile", DEFAULT_PROFILE)
+  );
+  const [draftName, setDraftName] = useState(profile.name);
   const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const completedSessionsRef = useRef<CompletedSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +32,24 @@ export function Settings() {
     patchSettings(patch);
   };
 
+  // Identity is journaled like everything else; empty values clear the
+  // field (the squad view falls back to "Anonymous" / the default avatar).
+  const commitName = () => {
+    const name = draftName.trim();
+    if (name === profile.name) {
+      setDraftName(profile.name);
+      return;
+    }
+    const next = recordProfile({ name });
+    setProfile(next);
+    setDraftName(next.name);
+  };
+
+  const commitAvatar = (avatar: string) => {
+    if (avatar === profile.avatar) return;
+    setProfile(recordProfile({ avatar }));
+  };
+
   useEffect(() => {
     const loadSessions = () => {
       const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
@@ -36,12 +60,20 @@ export function Settings() {
 
     loadSessions();
 
+    const loadProfile = () =>
+      setProfile(loadFromStorage<Profile>("stretch.profile", DEFAULT_PROFILE));
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "completedSessions") {
         loadSessions();
       }
+      if (e.key === "stretch.profile") {
+        loadProfile();
+      }
     };
-    const handleDataRefresh = () => loadSessions();
+    const handleDataRefresh = () => {
+      loadSessions();
+      loadProfile();
+    };
 
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("stretch:data", handleDataRefresh);
@@ -119,6 +151,50 @@ export function Settings() {
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
               </select>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <h2 className="text-lg font-semibold mb-4">Squad Identity</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            Your name and avatar in the squad standings.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm mb-1">Name</label>
+              <input
+                value={draftName}
+                maxLength={24}
+                placeholder="Anonymous"
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                className="input w-full py-2 px-3"
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Avatar</label>
+              <div className="grid grid-cols-5 gap-2">
+                {AVATARS.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    aria-label={`Avatar ${a}`}
+                    aria-pressed={profile.avatar === a}
+                    onClick={() => commitAvatar(a)}
+                    className={`text-2xl py-1.5 rounded-lg transition-colors ${
+                      profile.avatar === a
+                        ? "bg-primary-100 dark:bg-primary-900/40 ring-2 ring-primary-400"
+                        : "bg-white/60 dark:bg-gray-800/60 hover:bg-white dark:hover:bg-gray-700/60"
+                    }`}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </Card>

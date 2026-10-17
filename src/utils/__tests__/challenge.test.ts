@@ -1,26 +1,33 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   addDays,
-  completePlankDay,
+  completeChallengeDay,
   DEFAULT_PLANK_STATE,
+  durationChallengeMaxPoints,
+  durationChallengePoints,
   getChallengeProgress,
   getChallengeStatus,
+  activeChallenge,
+  loadChallengeState,
   mergePlankDay,
   pointsForHold,
-  startPlankChallenge,
+  startChallenge,
   todayKey,
 } from "../challenge";
 import type {
   Challenge,
+  DurationChallenge,
   PlankChallengeState,
 } from "../../types/challenge";
 
 const challenge: Challenge = {
   id: "plank-30-day",
+  syncId: "plank",
   title: "30-Day Plank Challenge",
   description: "test",
   exerciseId: "plank-hold",
   totalDays: 30,
+  scoring: "threshold",
   baseSeconds: 120,
   bonusSeconds: 30,
   bonusPoints: 0.5,
@@ -32,6 +39,23 @@ const challenge: Challenge = {
 
 /** Same challenge with milestones disabled, for plain-day scoring tests. */
 const plain: Challenge = { ...challenge, milestoneEvery: 0 };
+
+const maxChallenge: DurationChallenge = {
+  id: "plank-max-30-day",
+  syncId: "plank-max",
+  title: "30-Day Plank Max Challenge",
+  description: "test",
+  exerciseId: "plank-hold",
+  totalDays: 30,
+  startDate: "2026-11-01",
+  scoring: "duration",
+  baseSeconds: 120,
+  basePoints: 1,
+  incrementSeconds: 30,
+  incrementPoints: 0.5,
+  maxSeconds: 600,
+  illustration: "⏱️",
+};
 
 const START = "2026-01-05";
 
@@ -49,6 +73,10 @@ function onDay(offset: number, hour = 12): Date {
   const d = new Date(2026, 0, 5 + offset, hour, 0, 0);
   return d;
 }
+
+beforeEach(() => {
+  localStorage.clear();
+});
 
 describe("date helpers", () => {
   it("addDays crosses month boundaries", () => {
@@ -79,6 +107,51 @@ describe("pointsForHold", () => {
     expect(pointsForHold(challenge, 150, 1)).toBe(1.5);
     expect(pointsForHold(challenge, 300, 1)).toBe(1.5);
   });
+
+  it("scores 0 outside the challenge window", () => {
+    expect(pointsForHold(challenge, 150, 0)).toBe(0);
+    expect(pointsForHold(challenge, 150, 31)).toBe(0);
+  });
+});
+
+describe("duration scoring", () => {
+  it("scores 0 below the base hold", () => {
+    expect(pointsForHold(maxChallenge, 119, 1)).toBe(0);
+    expect(pointsForHold(maxChallenge, 0, 1)).toBe(0);
+  });
+
+  it("scores the base points at the base hold", () => {
+    expect(pointsForHold(maxChallenge, 120, 1)).toBe(1);
+    expect(pointsForHold(maxChallenge, 149, 1)).toBe(1);
+  });
+
+  it("scores +0.5 per full extra 30 seconds", () => {
+    expect(pointsForHold(maxChallenge, 150, 1)).toBe(1.5);
+    expect(pointsForHold(maxChallenge, 179, 1)).toBe(1.5);
+    expect(pointsForHold(maxChallenge, 180, 1)).toBe(2);
+    expect(pointsForHold(maxChallenge, 300, 1)).toBe(4);
+    expect(pointsForHold(maxChallenge, 599, 1)).toBe(8.5);
+  });
+
+  it("caps the points at maxSeconds", () => {
+    expect(pointsForHold(maxChallenge, 600, 1)).toBe(9);
+    expect(pointsForHold(maxChallenge, 3599, 1)).toBe(9);
+    expect(durationChallengeMaxPoints(maxChallenge)).toBe(9);
+  });
+
+  it("does not depend on the day number", () => {
+    expect(durationChallengePoints(maxChallenge, 240)).toBe(3);
+    expect(pointsForHold(maxChallenge, 240, 10)).toBe(3);
+    expect(pointsForHold(maxChallenge, 240, 30)).toBe(3);
+  });
+
+  it("scores 0 outside the challenge window", () => {
+    // A duration hold has no milestone day to hide behind — the window
+    // guard is what keeps out-of-window days (e.g. a day copied over from
+    // another challenge) from scoring.
+    expect(pointsForHold(maxChallenge, 150, 0)).toBe(0);
+    expect(pointsForHold(maxChallenge, 150, 31)).toBe(0);
+  });
 });
 
 describe("pointsForHold on milestone days", () => {
@@ -101,9 +174,80 @@ describe("pointsForHold on milestone days", () => {
     expect(pointsForHold(challenge, 180, 11)).toBe(1.5);
   });
 
-  it("does not apply the milestone outside the challenge window", () => {
-    expect(pointsForHold(challenge, 180, 0)).toBe(1.5);
-    expect(pointsForHold(challenge, 180, 31)).toBe(1.5);
+  it("scores 0 outside the challenge window, even at the milestone hold", () => {
+    expect(pointsForHold(challenge, 180, 0)).toBe(0);
+    expect(pointsForHold(challenge, 180, 31)).toBe(0);
+  });
+});
+
+describe("activeChallenge", () => {
+  // Config: two shared-clock cohorts — plank opens 2026-09-26 and runs
+  // until 2026-10-25, then two rest days, then plank-max opens 2026-10-28.
+  const statusOn = (now: Date) => {
+    const c = activeChallenge(now);
+    return getChallengeStatus(c, loadChallengeState(c), now);
+  };
+
+  it("shows the first cohort as upcoming before it opens", () => {
+    expect(activeChallenge(new Date(2026, 8, 1)).id).toBe("plank-30-day"); // Sep 1
+    expect(statusOn(new Date(2026, 8, 1)).status).toBe("not-started");
+  });
+
+  it("runs the plank cohort from its start through its last day", () => {
+    expect(statusOn(new Date(2026, 8, 26)).status).toBe("active"); // Sep 26, day 1
+    expect(statusOn(new Date(2026, 9, 25)).status).toBe("active"); // Oct 25, day 30
+  });
+
+  it("keeps the finished plank cohort on the card during the rest gap", () => {
+    expect(activeChallenge(new Date(2026, 9, 26)).id).toBe("plank-30-day"); // Oct 26
+    expect(statusOn(new Date(2026, 9, 26)).status).toBe("complete");
+    expect(statusOn(new Date(2026, 9, 27)).status).toBe("complete"); // Oct 27
+  });
+
+  it("hands the card over to plank-max when it opens", () => {
+    expect(activeChallenge(new Date(2026, 9, 28)).id).toBe("plank-max-30-day"); // Oct 28
+    expect(statusOn(new Date(2026, 9, 28)).status).toBe("active");
+    expect(statusOn(new Date(2026, 10, 10)).status).toBe("active"); // Nov 10
+    expect(statusOn(new Date(2026, 11, 26)).status).toBe("complete"); // Dec 26
+  });
+
+  it("opens a cohort early when the account has an earlier start op", () => {
+    // plank-max is configured for 2026-10-28, but this account's start op
+    // (e.g. pushed by the admin CLI) opens it on 2026-10-01.
+    localStorage.setItem(
+      "challenge:plank-max",
+      JSON.stringify({ startedAt: "2026-10-01", days: [] })
+    );
+    // Nothing opened yet: the fallback is the first configured cohort.
+    expect(activeChallenge(new Date(2026, 8, 15)).id).toBe("plank-30-day"); // Sep 15
+    expect(statusOn(new Date(2026, 8, 15)).status).toBe("not-started");
+    // The early op opens plank-max ahead of the configured date…
+    expect(activeChallenge(new Date(2026, 9, 5)).id).toBe("plank-max-30-day"); // Oct 5
+    // …and once both are open, the most recently opened cohort wins.
+    expect(statusOn(new Date(2026, 9, 15)).status).toBe("active"); // Oct 15
+  });
+
+  it("keeps a cohort closed when the account's start op is in the future", () => {
+    localStorage.setItem(
+      "challenge:plank-max",
+      JSON.stringify({ startedAt: "2026-12-01", days: [] })
+    );
+    // The configured date has arrived (Oct 29) but this account opens Dec 1:
+    // the card stays on the finished plank cohort.
+    expect(activeChallenge(new Date(2026, 9, 29)).id).toBe("plank-30-day"); // Oct 29
+    expect(statusOn(new Date(2026, 9, 29)).status).toBe("complete");
+    expect(statusOn(new Date(2026, 11, 5)).status).toBe("active"); // Dec 5
+  });
+
+  it("lets the most recently opened cohort win when windows overlap", () => {
+    // An account whose plank run was re-started later (window 10-20 – 11-18).
+    localStorage.setItem(
+      "plankChallenge",
+      JSON.stringify({ startedAt: "2026-10-20", days: [{ date: "2026-10-20", seconds: 120 }] })
+    );
+    expect(activeChallenge(new Date(2026, 9, 25)).id).toBe("plank-30-day"); // Oct 25
+    // plank-max opens Oct 28, which is more recent than this 10-20 start.
+    expect(activeChallenge(new Date(2026, 10, 10)).id).toBe("plank-max-30-day"); // Nov 10
   });
 });
 
@@ -305,6 +449,82 @@ describe("getChallengeStatus", () => {
   });
 });
 
+describe("cohort (duration) challenge status", () => {
+  const COHORT_START = "2026-11-01";
+
+  function onCohortDay(day: number): Date {
+    const d = new Date(2026, 10, 1 + (day - 1), 12);
+    return d;
+  }
+
+  it("is not started before the cohort start date", () => {
+    const status = getChallengeStatus(
+      maxChallenge,
+      { startedAt: COHORT_START, days: [] },
+      new Date(2026, 9, 15)
+    );
+    expect(status.status).toBe("not-started");
+    expect(status.daysLeft).toBe(30);
+  });
+
+  it("opens for everyone on the cohort start date, on the shared clock", () => {
+    const status = getChallengeStatus(
+      maxChallenge,
+      { startedAt: COHORT_START, days: [] },
+      onCohortDay(1)
+    );
+    expect(status.status).toBe("active");
+    expect(status.dayNumber).toBe(1);
+    expect(status.daysLeft).toBe(30);
+  });
+
+  it("scores days by hold length without milestones or recovery", () => {
+    // Day 1 at 2:00 (+1), day 2 at 2:30 (+1.5); today is day 3 with no hold.
+    const state = {
+      startedAt: COHORT_START,
+      days: [
+        { date: COHORT_START, seconds: 120 },
+        { date: addDays(COHORT_START, 1), seconds: 150 },
+      ],
+    };
+    const status = getChallengeStatus(maxChallenge, state, onCohortDay(3));
+    expect(status.score).toBeCloseTo(2.5);
+    expect(status.todayIsMilestone).toBe(false);
+    expect(status.bonusAvailable).toBe(false);
+    expect(status.missedDays).toBe(0);
+  });
+
+  it("counts a short hold as a missed day once it has passed", () => {
+    const state = {
+      startedAt: COHORT_START,
+      days: [{ date: COHORT_START, seconds: 45 }],
+    };
+    const status = getChallengeStatus(maxChallenge, state, onCohortDay(2));
+    expect(status.missedDays).toBe(1);
+    expect(status.score).toBe(0);
+    expect(status.deficit).toBe(1);
+  });
+
+  it("a day with a point-earning hold is done, even on milestone days", () => {
+    const state = {
+      startedAt: COHORT_START,
+      days: [{ date: addDays(COHORT_START, 9), seconds: 180 }], // day 10
+    };
+    const status = getChallengeStatus(maxChallenge, state, onCohortDay(10));
+    expect(status.todayIsMilestone).toBe(false);
+    expect(status.todayPoints).toBe(2);
+    expect(status.todayDone).toBe(true);
+  });
+
+  it("completes for everyone after the 30th cohort day", () => {
+    const state = { startedAt: COHORT_START, days: [] };
+    const lastDay = getChallengeStatus(maxChallenge, state, onCohortDay(30));
+    expect(lastDay.status).toBe("active");
+    const after = getChallengeStatus(maxChallenge, state, onCohortDay(31));
+    expect(after.status).toBe("complete");
+  });
+});
+
 describe("recovery bonus availability", () => {
   it("is not offered on a perfect run", () => {
     const state = mkState(START, [[START, 120]]);
@@ -461,6 +681,25 @@ describe("getChallengeProgress", () => {
       isMissed: true,
     });
   });
+
+  it("scores duration holds per day with a running total", () => {
+    // Day 1 at 2:30 (+1.5), day 2 at 5:00 (+4); today is day 3
+    const state = {
+      startedAt: "2026-11-01",
+      days: [
+        { date: "2026-11-01", seconds: 150 },
+        { date: "2026-11-02", seconds: 300 },
+      ],
+    };
+    const progress = getChallengeProgress(
+      maxChallenge,
+      state,
+      new Date(2026, 10, 2, 12)
+    );
+    expect(progress.days[0]).toMatchObject({ plankPoints: 1.5, runningTotal: 1.5, isMissed: false });
+    expect(progress.days[1]).toMatchObject({ plankPoints: 4, runningTotal: 5.5 });
+    expect(progress.plankTotal).toBe(5.5);
+  });
 });
 
 describe("mergePlankDay / completion", () => {
@@ -490,8 +729,8 @@ describe("mergePlankDay / completion", () => {
 });
 
 describe("persistence helpers", () => {
-  it("startPlankChallenge starts on today and saves", () => {
-    const state = startPlankChallenge(new Date(2026, 0, 5));
+  it("startChallenge starts on today and saves", () => {
+    const state = startChallenge(challenge, new Date(2026, 0, 5));
     expect(state).toEqual({ startedAt: "2026-01-05", days: [] });
     expect(localStorage.setItem).toHaveBeenCalledWith(
       "plankChallenge",
@@ -499,13 +738,22 @@ describe("persistence helpers", () => {
     );
   });
 
-  it("completePlankDay records today's hold", () => {
-    const state = completePlankDay(120, new Date(2026, 0, 5));
+  it("completeChallengeDay records today's hold", () => {
+    const state = completeChallengeDay(challenge, 120, new Date(2026, 0, 5));
     expect(state.startedAt).toBe("2026-01-05");
     expect(state.days).toEqual([{ date: "2026-01-05", seconds: 120 }]);
     expect(localStorage.setItem).toHaveBeenCalledWith(
       "plankChallenge",
       JSON.stringify(state)
     );
+  });
+
+  it("saves a cohort challenge to its own blob key", () => {
+    const state = completeChallengeDay(maxChallenge, 150, new Date(2026, 10, 5));
+    expect(state.days).toEqual([{ date: "2026-11-05", seconds: 150 }]);
+    const setItem = localStorage.setItem as ReturnType<typeof vi.fn>;
+    const cohortCall = setItem.mock.calls.find(([key]) => key === "challenge:plank-max");
+    expect(cohortCall).toBeDefined();
+    expect(JSON.parse(cohortCall![1]).days).toEqual([{ date: "2026-11-05", seconds: 150 }]);
   });
 });

@@ -1,8 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChallengeProgress } from '../ChallengeProgress';
-import { addDays, todayKey } from '../../utils/challenge';
 
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal();
@@ -26,38 +25,49 @@ function iso(dateKey: string, hour = 8): string {
 describe('ChallengeProgress page', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Oct 30: day 3 of the plank-max window that opens 2026-10-28.
+    vi.setSystemTime(new Date(2026, 9, 30, 12));
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockReset();
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockImplementation(() => null);
     (localStorage.setItem as ReturnType<typeof vi.fn>).mockReset();
     setStorage({});
   });
 
-  it('shows an empty state when the challenge has not started', () => {
-    render(
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows the (empty) window before the first cohort opens', () => {
+    vi.setSystemTime(new Date(2026, 8, 1, 12)); // Sep 1: before the Sep 26 open
+    const { container } = render(
       <MemoryRouter>
         <ChallengeProgress />
       </MemoryRouter>
     );
 
+    // The configured start date already "starts" the challenge, so the
+    // window renders even though no day has happened yet.
     expect(screen.getByText('Point progress')).toBeInTheDocument();
-    expect(screen.getByText('No challenge yet')).toBeInTheDocument();
-    expect(screen.getByText('Start Challenge')).toBeInTheDocument();
+    expect(screen.getByText('Day 1 of 30')).toBeInTheDocument();
+    expect(screen.getByText('On pace')).toBeInTheDocument();
+    expect(screen.getByText('Plank points')).toBeInTheDocument();
+    expect(container.querySelector('polyline')).toBeInTheDocument();
+    expect(container.querySelectorAll('li')).toHaveLength(0);
+    expect(screen.queryByText('No challenge yet')).not.toBeInTheDocument();
   });
 
   it('shows per-day plank points with a running total, ignoring routines', () => {
-    const today = todayKey();
-    const day1 = addDays(today, -2);
-    const day2 = addDays(today, -1);
+    // Day 1 (Oct 28) done, day 2 (Oct 29) missed => 1 point of deficit
 
     // Routine sessions exist but must not appear on this (plank-only) page
     setStorage({
-      plankChallenge: JSON.stringify({
-        startedAt: day1,
-        days: [{ date: day1, seconds: 120 }],
+      'challenge:plank-max': JSON.stringify({
+        startedAt: '2026-10-28',
+        days: [{ date: '2026-10-28', seconds: 120 }],
       }),
       completedSessions: JSON.stringify([
-        { id: 's1', routineId: 'wake-up-workout', routineTitle: 'Wake Up', duration: 10, completedAt: iso(day1, 8) },
-        { id: 's2', routineId: 'evening-unwind', routineTitle: 'Evening', duration: 10, completedAt: iso(day2, 19) },
+        { id: 's1', routineId: 'wake-up-workout', routineTitle: 'Wake Up', duration: 10, completedAt: iso('2026-10-28', 8) },
+        { id: 's2', routineId: 'evening-unwind', routineTitle: 'Evening', duration: 10, completedAt: iso('2026-10-29', 19) },
       ]),
     });
 
@@ -87,5 +97,10 @@ describe('ChallengeProgress page', () => {
     expect(screen.getByText('D1')).toBeInTheDocument();
     expect(screen.getByText('D2')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();
+
+    // The list is newest-first: today on top, day 1 at the bottom.
+    const rows = container.querySelectorAll('li');
+    expect(rows[0].textContent).toContain('D3');
+    expect(rows[rows.length - 1].textContent).toContain('D1');
   });
 });
