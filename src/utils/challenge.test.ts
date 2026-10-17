@@ -11,6 +11,7 @@ import {
   loadChallengeState,
   mergePlankDay,
   pointsForHold,
+  selectActiveChallenge,
   startChallenge,
   todayKey,
 } from "./challenge";
@@ -248,6 +249,109 @@ describe("activeChallenge", () => {
     expect(activeChallenge(new Date(2026, 9, 25)).id).toBe("plank-30-day"); // Oct 25
     // plank-max opens Oct 28, which is more recent than this 10-20 start.
     expect(activeChallenge(new Date(2026, 10, 10)).id).toBe("plank-max-30-day"); // Nov 10
+  });
+});
+
+describe("selectActiveChallenge (pure)", () => {
+  // A synthetic lineup: one self-start challenge and two cohorts. The
+  // stateOf injection (instead of localStorage) is what makes the
+  // priority rules testable in isolation.
+  const selfStartC: Challenge = {
+    id: "self-start-30-day",
+    syncId: "self-start",
+    title: "Self Start",
+    description: "test",
+    exerciseId: "plank-hold",
+    totalDays: 30,
+    scoring: "threshold",
+    baseSeconds: 120,
+    bonusSeconds: 30,
+    bonusPoints: 0.5,
+    milestoneEvery: 10,
+    milestoneSeconds: 180,
+    milestonePoints: 2,
+    illustration: "💪",
+  };
+  const cohortA: Challenge = {
+    id: "cohort-a-30-day",
+    syncId: "cohort-a",
+    title: "Cohort A",
+    description: "test",
+    exerciseId: "plank-hold",
+    totalDays: 30,
+    startDate: "2026-10-01",
+    scoring: "duration",
+    baseSeconds: 120,
+    basePoints: 1,
+    incrementSeconds: 30,
+    incrementPoints: 0.5,
+    maxSeconds: 600,
+    illustration: "⏱️",
+  };
+  const cohortB: Challenge = {
+    ...cohortA,
+    id: "cohort-b-30-day",
+    syncId: "cohort-b",
+    title: "Cohort B",
+    startDate: "2026-12-01",
+  };
+  const list: Challenge[] = [selfStartC, cohortA, cohortB];
+
+  // Mirrors loadChallengeState: a stored state wins, and cohort challenges
+  // fall back to their configured startDate.
+  function mkStateOf(states: Record<string, PlankChallengeState>) {
+    return (c: Challenge): PlankChallengeState =>
+      states[c.syncId] ?? { startedAt: c.startDate ?? null, days: [] };
+  }
+
+  it("prefers a self-start challenge the user is currently inside", () => {
+    // Window 10-10..11-08; cohort A opened 10-01, but a running
+    // self-start is never cut away from.
+    const stateOf = mkStateOf({ "self-start": { startedAt: "2026-10-10", days: [] } });
+    expect(selectActiveChallenge(list, stateOf, new Date(2026, 9, 15)).syncId).toBe(
+      "self-start"
+    );
+  });
+
+  it("picks the most recently opened cohort when nothing is running", () => {
+    // Cohort A opened on its configured date; cohort B's account start op
+    // opened it earlier than its configured 12-01.
+    const stateOf = mkStateOf({ "cohort-b": { startedAt: "2026-10-15", days: [] } });
+    expect(selectActiveChallenge(list, stateOf, new Date(2026, 9, 20)).syncId).toBe(
+      "cohort-b"
+    );
+  });
+
+  it("hands a finished self-start over to the soonest upcoming cohort", () => {
+    // Window 09-01..09-30 is over and no cohort has opened yet (both
+    // start dates are after 10-15): the soonest upcoming one is shown.
+    const laterA: Challenge = { ...cohortA, startDate: "2026-11-01" };
+    const laterB: Challenge = { ...cohortA, syncId: "cohort-b", startDate: "2026-12-01" };
+    const lineup = [selfStartC, laterA, laterB];
+    const stateOf = mkStateOf({ "self-start": { startedAt: "2026-09-01", days: [] } });
+    expect(selectActiveChallenge(lineup, stateOf, new Date(2026, 9, 15)).syncId).toBe(
+      "cohort-a"
+    ); // the 11-01 one, before the 12-01 one
+  });
+
+  it("gives a fresh user the last self-start challenge", () => {
+    const stateOf = mkStateOf({});
+    // Before any cohort opens (both start dates are after Sep 15) and
+    // nothing started: the fallback is the self-start challenge.
+    expect(selectActiveChallenge(list, stateOf, new Date(2026, 8, 15)).syncId).toBe(
+      "self-start"
+    );
+  });
+
+  it("keeps a cohort closed when the account's start op is in the future", () => {
+    // Without the op, cohort A would be open on 10-15 (configured 10-01).
+    const open = mkStateOf({});
+    expect(selectActiveChallenge(list, open, new Date(2026, 9, 15)).syncId).toBe("cohort-a");
+    // With an account op pushing its start to 12-01, it is not open yet.
+    const closed = mkStateOf({ "cohort-a": { startedAt: "2026-12-01", days: [] } });
+    expect(selectActiveChallenge(list, closed, new Date(2026, 9, 15)).syncId).toBe(
+      "self-start"
+    );
   });
 });
 

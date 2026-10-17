@@ -34,10 +34,20 @@ export function dataRevision(): number {
   return revision;
 }
 
-/** Call after a projection rewrite has happened (new ops folded in). */
+/**
+ * Call after a projection rewrite has happened (new ops folded in).
+ * A listener that throws is contained (logged, skipped onward) so one
+ * bad subscriber cannot break the sync flow or the other subscribers.
+ */
 export function notifyDataChanged(): void {
   revision += 1;
-  for (const listener of [...listeners]) listener();
+  for (const listener of [...listeners]) {
+    try {
+      listener();
+    } catch (err) {
+      console.error("[dataChange] listener failed", err);
+    }
+  }
 }
 
 /**
