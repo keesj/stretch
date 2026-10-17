@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { replayOps } from "./replay";
+import { replayOps } from ".//replay";
 import { DEFAULT_PROFILE, DEFAULT_TROPHY_CASE, type Op, type TrophyCaseState } from "./types";
 import type { PlankChallengeState } from "../types/challenge";
 import type { CompletedSession, Settings } from "../utils/storage";

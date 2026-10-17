@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, afterEach } from "vitest";
-import { newUuid, UUID_V4_RE } from "./uuid";
+import { newUuid, UUID_V4_RE } from ".//uuid";
 
 afterEach(() => {
   vi.unstubAllGlobals();

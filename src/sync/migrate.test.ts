@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { legacyToOps, migrateLegacyIfNeeded } from "./migrate";
-import { freezeLegacyIfNeeded, loadJournal } from "./journal";
-import { compareHlc } from "./hlc";
+import { legacyToOps, migrateLegacyIfNeeded } from ".//migrate";
+import { freezeLegacyIfNeeded, loadJournal } from ".//journal";
+import { compareHlc } from ".//hlc";
 import type { LegacyBase } from "./types";
 
 const LEGACY: LegacyBase = {

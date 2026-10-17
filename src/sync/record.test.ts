@@ -5,8 +5,8 @@ import {
   recordPlankDay,
   recordSession,
   resetProgress,
-} from "./record";
-import { loadJournal } from "./journal";
+} from ".//record";
+import { loadJournal } from ".//journal";
 import { challenges } from "../data/challenges";
 import type { CompletedSession, Settings } from "../utils/storage";
 import type { Challenge } from "../types/challenge";

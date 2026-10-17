@@ -7,8 +7,8 @@ import {
   bootstrap,
   revokeSelf,
   SyncError,
-} from "./syncClient";
-import { setToken } from "./identity";
+} from ".//syncClient";
+import { setToken } from ".//identity";
 import type { Op } from "./types";
 
 const op: Op = {

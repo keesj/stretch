@@ -36,6 +36,7 @@ import {
   type TrophyCaseState,
 } from "../sync/types";
 import { recordTrophyCase } from "../sync/record";
+import { useDataRevision } from "../sync/dataChange";
 import { normalizeTrophyCaseState } from "../sync/replay";
 import { getUserId } from "../sync/identity";
 import { displayName, displayAvatar, nameColor } from "../utils/display";
@@ -172,15 +173,20 @@ export function Chamber() {
     );
   };
 
+  // A sync round that absorbs remote ops rewrites the projection blobs;
+  // pick the new profile / trophy case up without leaving the page.
+  // Skips the mount (the state is already fresh).
+  const revision = useDataRevision();
+  const firstDataChange = useRef(true);
   useEffect(() => {
-    const refresh = () => {
-      setProfile(loadFromStorage("stretch.profile", DEFAULT_PROFILE));
-      setTrophyCase(normalizeTrophyCaseState(loadFromStorage<unknown>("stretch.trophyCase", DEFAULT_TROPHY_CASE)));
-      setTick((t) => t + 1);
-    };
-    window.addEventListener("stretch:data", refresh);
-    return () => window.removeEventListener("stretch:data", refresh);
-  }, []);
+    if (firstDataChange.current) {
+      firstDataChange.current = false;
+      return;
+    }
+    setProfile(loadFromStorage("stretch.profile", DEFAULT_PROFILE));
+    setTrophyCase(normalizeTrophyCaseState(loadFromStorage<unknown>("stretch.trophyCase", DEFAULT_TROPHY_CASE)));
+    setTick((t) => t + 1);
+  }, [revision]);
 
   const stats = useMemo(() => {
     void tick;

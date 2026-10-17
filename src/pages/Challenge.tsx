@@ -9,6 +9,7 @@ import { useBeep } from "../hooks/useBeep";
 import { useWakeLock } from "../hooks/useWakeLock";
 import { formatTime } from "../utils/timer";
 import { loadFromStorage, DEFAULT_SETTINGS } from "../utils/storage";
+import { useDataRevision } from "../sync/dataChange";
 import {
   activeChallenge,
   loadChallengeState,
@@ -35,7 +36,10 @@ function formatOpenDate(dateKey: string): string {
 
 export function Challenge() {
   const navigate = useNavigate();
-  const challenge = useMemo(() => activeChallenge(), []);
+  const revision = useDataRevision();
+  // Re-selected when the projection blobs change (e.g. a cohort opening
+  // on another device mid-session).
+  const challenge = useMemo(() => activeChallenge(), [revision]);
   const exercise = useMemo(
     () => stretchesData.find((s) => s.id === challenge.exerciseId),
     [challenge]
@@ -67,12 +71,16 @@ export function Challenge() {
   const { scheduleBeeps, playHappyBeep, getClock } = useBeep(soundEnabled);
 
   // A sync round that absorbs remote ops rewrites the projection blobs;
-  // pick the new state up without leaving the page.
+  // pick the new state up without leaving the page. Skips the mount (the
+  // state is already fresh).
+  const firstDataChange = useRef(true);
   useEffect(() => {
-    const onRefresh = () => setPlankState(loadChallengeState(challenge));
-    window.addEventListener("stretch:data", onRefresh);
-    return () => window.removeEventListener("stretch:data", onRefresh);
-  }, [challenge]);
+    if (firstDataChange.current) {
+      firstDataChange.current = false;
+      return;
+    }
+    setPlankState(loadChallengeState(challenge));
+  }, [revision, challenge]);
 
   const cancelCountdown = useCallback(() => {
     if (countdownRafRef.current != null) {

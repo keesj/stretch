@@ -11,6 +11,7 @@ import {
 } from "./identity";
 import { appendOps, freezeLegacyIfNeeded, loadJournal, projectWith, quarantineOps } from "./journal";
 import { migrateLegacyIfNeeded } from "./migrate";
+import { notifyDataChanged } from "./dataChange";
 import type { Op } from "./types";
 import { useDeviceIdentity } from "./useDeviceIdentity";
 
@@ -66,7 +67,7 @@ async function syncRound(ops: Op[]): Promise<void> {
     const merged = appendOps(fresh);
     projectWith(merged);
     // Same-tab refresh for pages that read the projection blobs.
-    window.dispatchEvent(new CustomEvent("stretch:data"));
+    notifyDataChanged();
   }
 }
 

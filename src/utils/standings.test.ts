@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
-import { computeStandings, podiumTaunt, type SquadMember } from "./standings";
-import { displayName, displayAvatar, nameColor, AVATARS } from "./display";
+import { computeStandings, podiumTaunt, type SquadMember } from ".//standings";
+import { displayName, displayAvatar, nameColor, AVATARS } from ".//display";
 import type { StandingsFeed } from "../sync/types";
 
 // A duration challenge shaped like the cohort one: 1 pt at 120 s, +0.5 per

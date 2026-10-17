@@ -12,7 +12,7 @@ import {
   regenerateUserId,
   setRole,
   setToken,
-} from "./identity";
+} from ".//identity";
 
 const UUID = "11111111-2222-4333-8444-555555555555";
 

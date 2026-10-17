@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
-import challengesRaw from "./challenges.json";
-import routinesRaw from "./routines.json";
-import stretchesRaw from "./stretches.json";
-import { challenges } from "./challenges";
-import { routines } from "./routines";
-import { stretches } from "./stretches";
+import challengesRaw from ".//challenges.json";
+import routinesRaw from ".//routines.json";
+import stretchesRaw from ".//stretches.json";
+import { challenges } from ".//challenges";
+import { routines } from ".//routines";
+import { stretches } from ".//stretches";
 import {
   DataValidationError,
   validateChallenges,
   validateRoutines,
   validateStretches,
-} from "./validate";
+} from ".//validate";
 import type { Stretch } from "../types/stretch";
 
 type Raw = Record<string, unknown>;

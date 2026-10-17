@@ -18,6 +18,7 @@ import {
   challengeBlobKey,
 } from "../utils/challenge";
 import type { PlankChallengeState } from "../types/challenge";
+import { useDataRevision } from "../sync/dataChange";
 
 import { routines as routinesData } from "../data/routines";
 import { stretches as stretchesData } from "../data/stretches";
@@ -29,7 +30,10 @@ export function Home() {
   const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const completedSessionsRef = useRef<CompletedSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const plankChallenge = useMemo(() => activeChallenge(), []);
+  const revision = useDataRevision();
+  // Re-selected when the projection blobs change (a sync round can flip
+  // which challenge is active, e.g. a cohort opening on another device).
+  const plankChallenge = useMemo(() => activeChallenge(), [revision]);
   const [plankState, setPlankState] = useState<PlankChallengeState>(() =>
     loadChallengeState(plankChallenge)
   );
@@ -59,24 +63,34 @@ export function Home() {
         setPlankState(loadChallengeState(plankChallenge));
       }
     };
-    // Fired after a sync round absorbs remote ops (same tab).
-    const handleDataRefresh = () => {
-      loadSessions();
-      setPlankState(loadChallengeState(plankChallenge));
-    };
-
     try {
       window.addEventListener("storage", handleStorageChange);
-      window.addEventListener("stretch:data", handleDataRefresh);
     } catch { /* storage events not supported */ }
 
     return () => {
       try {
         window.removeEventListener("storage", handleStorageChange);
-        window.removeEventListener("stretch:data", handleDataRefresh);
       } catch { /* cleanup failed */ }
     };
   }, [challengeBlob, plankChallenge]);
+
+  // Fired after a sync round absorbs remote ops (same tab): re-read the
+  // projection blobs. Skips the mount (the state is already fresh).
+  const firstDataChange = useRef(true);
+  useEffect(() => {
+    if (firstDataChange.current) {
+      firstDataChange.current = false;
+      return;
+    }
+    try {
+      const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
+      setCompletedSessions(sessions);
+      completedSessionsRef.current = sessions;
+    } catch {
+      setCompletedSessions([]);
+    }
+    setPlankState(loadChallengeState(plankChallenge));
+  }, [revision, plankChallenge]);
 
   if (isLoading) {
     return (

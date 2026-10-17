@@ -1,8 +1,9 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { useSyncStore } from "./useSyncStore";
-import { useDeviceIdentity } from "./useDeviceIdentity";
-import { setToken } from "./identity";
-import { appendOps, loadJournal } from "./journal";
+import { useSyncStore } from ".//useSyncStore";
+import { useDeviceIdentity } from ".//useDeviceIdentity";
+import { setToken } from ".//identity";
+import { appendOps, loadJournal } from ".//journal";
+import { onDataChanged } from ".//dataChange";
 import type { Op } from "./types";
 
 const TOKEN = "dGVzdC10b2tlbi0wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMA";
@@ -70,13 +71,12 @@ describe("syncNow", () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, { ops: [remote], serverTime: 1 }));
 
     let refreshed = false;
-    const onRefresh = () => {
+    const unsubscribe = onDataChanged(() => {
       refreshed = true;
-    };
-    window.addEventListener("stretch:data", onRefresh);
+    });
 
     await useSyncStore.getState().syncNow();
-    window.removeEventListener("stretch:data", onRefresh);
+    unsubscribe();
 
     expect(loadJournal().map((o) => o.id)).toEqual(["remote-1"]);
     const plank = JSON.parse(localStorage.getItem("plankChallenge")!);

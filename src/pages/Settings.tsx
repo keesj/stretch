@@ -9,6 +9,7 @@ import { loadFromStorage, DEFAULT_SETTINGS, type Settings, type CompletedSession
 import { patchSettings, recordProfile, resetProgress } from "../sync/record";
 import { DEFAULT_PROFILE, type Profile } from "../sync/types";
 import { AVATARS } from "../utils/display";
+import { useDataRevision } from "../sync/dataChange";
 
 export function Settings() {
   const navigate = useNavigate();
@@ -70,18 +71,26 @@ export function Settings() {
         loadProfile();
       }
     };
-    const handleDataRefresh = () => {
-      loadSessions();
-      loadProfile();
-    };
-
     window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("stretch:data", handleDataRefresh);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("stretch:data", handleDataRefresh);
     };
   }, []);
+
+  // Fired after a sync round absorbs remote ops (same tab): re-read the
+  // projection blobs. Skips the mount (the state is already fresh).
+  const revision = useDataRevision();
+  const firstDataChange = useRef(true);
+  useEffect(() => {
+    if (firstDataChange.current) {
+      firstDataChange.current = false;
+      return;
+    }
+    const sessions = loadFromStorage<CompletedSession[]>("completedSessions", []);
+    setCompletedSessions(sessions);
+    completedSessionsRef.current = sessions;
+    setProfile(loadFromStorage<Profile>("stretch.profile", DEFAULT_PROFILE));
+  }, [revision]);
 
   if (isLoading) {
     return (

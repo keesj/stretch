@@ -15,7 +15,7 @@ import {
   shelfCost,
   shelfPoints,
   type TrophyStats,
-} from "./trophies";
+} from ".//trophies";
 import { MAX_ITEMS } from "../sync/types";
 
 function stats(overrides: Partial<TrophyStats> = {}): TrophyStats {
@@ -28,9 +28,9 @@ function stats(overrides: Partial<TrophyStats> = {}): TrophyStats {
     ...overrides,
   };
 }
-import { addDays } from "./challenge";
+import { addDays } from ".//challenge";
 import type { Challenge, PlankChallengeState } from "../types/challenge";
-import type { CompletedSession } from "./storage";
+import type { CompletedSession } from ".//storage";
 
 const DURATION: Challenge = {
   id: "plank-max-30-day",

@@ -1,0 +1,152 @@
+import { renderHook } from '@testing-library/react';
+import { useBeep } from './useBeep';
+
+interface AudioMocks {
+  createOscillator: ReturnType<typeof vi.fn>;
+  createGain: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+}
+
+function installMockAudioContext(): AudioMocks {
+  const createOscillator = vi.fn(() => ({
+    connect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    frequency: { value: 0 },
+    type: 'sine',
+  }));
+  const createGain = vi.fn(() => ({
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    gain: {
+      setValueAtTime: vi.fn(),
+      exponentialRampToValueAtTime: vi.fn(),
+    },
+  }));
+  const close = vi.fn();
+
+  function MockAudioContext(this: Record<string, unknown>) {
+    this.createOscillator = createOscillator;
+    this.createGain = createGain;
+    this.destination = {};
+    this.currentTime = 0;
+    this.close = close;
+  }
+
+  Object.defineProperty(globalThis, 'AudioContext', {
+    value: MockAudioContext,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, 'webkitAudioContext', {
+    value: undefined,
+    writable: true,
+    configurable: true,
+  });
+
+  return { createOscillator, createGain, close };
+}
+
+describe('useBeep', () => {
+  it('returns playBeep, playFinalBeep, scheduleBeeps and playHappyBeep', () => {
+    const { result } = renderHook(() => useBeep(true));
+    expect(result.current).toHaveProperty('playBeep');
+    expect(result.current).toHaveProperty('playFinalBeep');
+    expect(result.current).toHaveProperty('scheduleBeeps');
+    expect(result.current).toHaveProperty('playHappyBeep');
+    expect(typeof result.current.playBeep).toBe('function');
+    expect(typeof result.current.playFinalBeep).toBe('function');
+    expect(typeof result.current.scheduleBeeps).toBe('function');
+    expect(typeof result.current.playHappyBeep).toBe('function');
+  });
+
+  it('schedules each beep in a batch on the audio clock', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(true));
+
+    result.current.scheduleBeeps([
+      { frequency: 800, at: 0, duration: 0.1 },
+      { frequency: 800, at: 1, duration: 0.1 },
+      { frequency: 1200, at: 3, duration: 0.3 },
+    ]);
+
+    expect(mocks.createOscillator).toHaveBeenCalledTimes(3);
+    expect(mocks.createGain).toHaveBeenCalledTimes(3);
+    const starts = mocks.createOscillator.mock.results.map((r) => r.value.start);
+    expect(starts[0]).toHaveBeenCalledWith(0);
+    expect(starts[1]).toHaveBeenCalledWith(1);
+    expect(starts[2]).toHaveBeenCalledWith(3);
+  });
+
+  it('does not schedule beeps when disabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(false));
+
+    result.current.scheduleBeeps([{ frequency: 800, at: 0, duration: 0.1 }]);
+
+    expect(mocks.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('plays a 4-note happy arpeggio when enabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(true));
+
+    result.current.playHappyBeep();
+
+    expect(mocks.createOscillator).toHaveBeenCalledTimes(4);
+    expect(mocks.createGain).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not play the happy arpeggio when disabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(false));
+
+    result.current.playHappyBeep();
+
+    expect(mocks.createOscillator).not.toHaveBeenCalled();
+  });
+
+  it('does not create audio nodes when disabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(false));
+
+    result.current.playBeep(800, 0.1);
+    result.current.playFinalBeep();
+
+    expect(mocks.createOscillator).not.toHaveBeenCalled();
+    expect(mocks.createGain).not.toHaveBeenCalled();
+  });
+
+  it('plays a beep with an oscillator and gain node when enabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(true));
+
+    result.current.playBeep(800, 0.1);
+
+    expect(mocks.createOscillator).toHaveBeenCalledTimes(1);
+    expect(mocks.createGain).toHaveBeenCalledTimes(1);
+    expect(mocks.createOscillator.mock.results[0].value.start).toHaveBeenCalled();
+  });
+
+  it('plays the final beep when enabled', () => {
+    const mocks = installMockAudioContext();
+    const { result } = renderHook(() => useBeep(true));
+
+    result.current.playFinalBeep();
+
+    expect(mocks.createOscillator).toHaveBeenCalledTimes(1);
+    expect(mocks.createGain).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the audio context on unmount', () => {
+    const mocks = installMockAudioContext();
+    const { result, unmount } = renderHook(() => useBeep(true));
+
+    result.current.playBeep(800, 0.1);
+    expect(mocks.close).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(mocks.close).toHaveBeenCalledTimes(1);
+  });
+});

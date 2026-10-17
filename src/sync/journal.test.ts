@@ -6,7 +6,7 @@ import {
   projectWith,
   quarantineOps,
   readLegacy,
-} from "./journal";
+} from ".//journal";
 import type { Op } from "./types";
 import type { PlankChallengeState } from "../types/challenge";
 

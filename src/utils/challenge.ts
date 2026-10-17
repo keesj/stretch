@@ -56,14 +56,21 @@ function daysBetween(a: string, b: string): number {
  * 3. the soonest upcoming cohort — shown as an "Opens …" preview — once a
  *    self-start run has finished but no cohort has opened yet,
  * 4. the latest self-start challenge (a fresh user can still start it).
+ *
+ * Pure on purpose: the state is injected (`stateOf`) so the priority rule
+ * is testable without localStorage.
  */
-export function activeChallenge(now: Date = new Date()): Challenge {
+export function selectActiveChallenge(
+  challengeList: readonly Challenge[],
+  stateOf: (challenge: Challenge) => PlankChallengeState,
+  now: Date = new Date()
+): Challenge {
   const today = todayKey(now);
   let selfStart: Challenge | null = null;
   let selfStartEnd: string | null = null;
-  for (const challenge of challenges) {
+  for (const challenge of challengeList) {
     if (challenge.startDate) continue;
-    const state = loadChallengeState(challenge);
+    const state = stateOf(challenge);
     if (!state.startedAt) continue;
     selfStart = challenge;
     selfStartEnd = addDays(state.startedAt, challenge.totalDays - 1);
@@ -71,10 +78,10 @@ export function activeChallenge(now: Date = new Date()): Challenge {
   }
   let cohort: Challenge | null = null;
   let cohortStart = "";
-  for (const challenge of challenges) {
+  for (const challenge of challengeList) {
     if (!challenge.startDate) continue;
-    // loadChallengeState already falls back to the configured startDate.
-    const opened = loadChallengeState(challenge).startedAt;
+    // stateOf (loadChallengeState) already falls back to the configured startDate.
+    const opened = stateOf(challenge).startedAt;
     if (!opened || opened > today) continue;
     if (opened > cohortStart) {
       cohortStart = opened;
@@ -87,9 +94,9 @@ export function activeChallenge(now: Date = new Date()): Challenge {
   if (selfStart && selfStartEnd && selfStartEnd < today) {
     let upcoming: Challenge | null = null;
     let upcomingStart = "";
-    for (const challenge of challenges) {
+    for (const challenge of challengeList) {
       if (!challenge.startDate) continue;
-      const opened = loadChallengeState(challenge).startedAt;
+      const opened = stateOf(challenge).startedAt;
       if (!opened || opened <= today) continue;
       if (!upcomingStart || opened < upcomingStart) {
         upcomingStart = opened;
@@ -98,8 +105,13 @@ export function activeChallenge(now: Date = new Date()): Challenge {
     }
     if (upcoming) return upcoming;
   }
-  const selfStarts = challenges.filter((c) => !c.startDate);
-  return selfStarts[selfStarts.length - 1] ?? challenges[0];
+  const selfStarts = challengeList.filter((c) => !c.startDate);
+  return selfStarts[selfStarts.length - 1] ?? challengeList[0];
+}
+
+/** The challenge to show this user right now (reads the projection blobs). */
+export function activeChallenge(now: Date = new Date()): Challenge {
+  return selectActiveChallenge(challenges, loadChallengeState, now);
 }
 
 /** Every configured challenge with its loaded state (all-time progress). */
