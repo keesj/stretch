@@ -20,9 +20,8 @@ import {
 } from "../utils/challenge";
 import { MIN_VALID_HOLD_SECONDS } from "../types/challenge";
 import type { PlankChallengeState } from "../types/challenge";
-import type { Stretch } from "../types/stretch";
 
-import stretchesData from "../data/stretches.json";
+import { stretches as stretchesData } from "../data/stretches";
 
 type Phase = "intro" | "ready" | "countdown" | "holding" | "done";
 
@@ -38,7 +37,7 @@ export function Challenge() {
   const navigate = useNavigate();
   const challenge = useMemo(() => activeChallenge(), []);
   const exercise = useMemo(
-    () => (stretchesData as Stretch[]).find((s) => s.id === challenge.exerciseId),
+    () => stretchesData.find((s) => s.id === challenge.exerciseId),
     [challenge]
   );
 

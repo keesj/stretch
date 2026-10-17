@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Home } from '../Home';
-import routinesData from '../../data/routines.json';
+import { routines as routinesData } from '../../data/routines';
 
 const navigateMockRef = vi.hoisted(() => ({ fn: vi.fn() }));
 
@@ -53,7 +53,7 @@ describe('Home Page', () => {
     render(<MemoryRouter><Home /></MemoryRouter>);
     // 1 challenge ("Start Day 22") + one "Start" per routine
     expect(screen.getAllByRole('button', { name: /Start/i })).toHaveLength(
-      (routinesData as { id: string }[]).length + 1
+      routinesData.length + 1
     );
   });
 

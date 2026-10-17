@@ -11,13 +11,12 @@ import { useWakeLock } from "../hooks/useWakeLock";
 import { formatDuration } from "../utils/timer";
 import { loadFromStorage, DEFAULT_SETTINGS } from "../utils/storage";
 import type { Stretch } from "../types/stretch";
-import type { Routine } from "../types/routine";
 
-import routinesData from "../data/routines.json";
-import stretchesData from "../data/stretches.json";
+import { routines as routinesData } from "../data/routines";
+import { stretches as stretchesData } from "../data/stretches";
 
-const routines = routinesData as Routine[];
-const stretches = stretchesData as Stretch[];
+const routines = routinesData;
+const stretches = stretchesData;
 
 const difficultyColors = {
   easy: "text-green-600 dark:text-green-400",

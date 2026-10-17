@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import type { Routine } from "../types/routine";
-import type { Stretch } from "../types/stretch";
 import { RoutineCard } from "../components/RoutineCard";
 import { ChallengeCard } from "../components/ChallengeCard";
 import { Card } from "../components/Card";
@@ -20,13 +19,13 @@ import {
 } from "../utils/challenge";
 import type { PlankChallengeState } from "../types/challenge";
 
-import routinesData from "../data/routines.json";
-import stretchesData from "../data/stretches.json";
+import { routines as routinesData } from "../data/routines";
+import { stretches as stretchesData } from "../data/stretches";
 
 export function Home() {
   const navigate = useNavigate();
-  const [routines] = useState<Routine[]>(routinesData as Routine[]);
-  const [stretches] = useState<Stretch[]>(stretchesData as Stretch[]);
+  const [routines] = useState(routinesData);
+  const [stretches] = useState(stretchesData);
   const [_completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const completedSessionsRef = useRef<CompletedSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
