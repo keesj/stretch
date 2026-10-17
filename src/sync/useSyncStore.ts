@@ -38,7 +38,8 @@ async function ensureToken(): Promise<void> {
   } catch (err) {
     if (err instanceof SyncError && err.status === 409) {
       throw new Error(
-        "This account is already linked elsewhere — paste its pairing code in the Sync card."
+        "This account is already linked elsewhere — paste its pairing code in the Sync card.",
+        { cause: err }
       );
     }
     throw err;

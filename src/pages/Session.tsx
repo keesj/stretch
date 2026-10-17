@@ -189,6 +189,7 @@ export function Session() {
           <section
             // The same stretch can appear twice in a routine (e.g. as an
             // opener and closer), so the index disambiguates the key
+            // oxlint-disable-next-line react/no-array-index-key
             key={`${exercise.id}-${index}`}
             inert={index !== activeIndex}
             className="h-full snap-start"
@@ -264,7 +265,12 @@ export function Session() {
               </div>
               <ol className="space-y-2 mb-6">
                 {activeExercise.instructions.map((instruction, index) => (
-                  <li key={index} className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                  // Static numbered instructions; the index is the key.
+                  <li
+                    // oxlint-disable-next-line react/no-array-index-key
+                    key={index}
+                    className="flex gap-3 text-sm text-gray-600 dark:text-gray-300"
+                  >
                     <span className="font-semibold text-primary-600 dark:text-primary-400">
                       {index + 1}.
                     </span>

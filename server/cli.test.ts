@@ -488,7 +488,7 @@ describe('cli squads', () => {
 
   test('removing a non-member and a missing squad both fail', () => {
     const db = createSyncDb(dbPath);
-    const squad = db.createSquad('Quiet');
+    db.createSquad('Quiet');
     db.close();
 
     expect(run(['squads', 'remove', 'Quiet', ACCOUNT])).toBe(1);

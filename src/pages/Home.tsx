@@ -33,6 +33,7 @@ export function Home() {
   const revision = useDataRevision();
   // Re-selected when the projection blobs change (a sync round can flip
   // which challenge is active, e.g. a cohort opening on another device).
+  // oxlint-disable-next-line react/memo-dependencies react-hooks/exhaustive-deps
   const plankChallenge = useMemo(() => activeChallenge(), [revision]);
   const [plankState, setPlankState] = useState<PlankChallengeState>(() =>
     loadChallengeState(plankChallenge)
@@ -90,6 +91,7 @@ export function Home() {
       setCompletedSessions([]);
     }
     setPlankState(loadChallengeState(plankChallenge));
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [revision, plankChallenge]);
 
   if (isLoading) {

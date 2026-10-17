@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck + tests
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+      - name: Server smoke (Node runs the TS server via type stripping)
+        run: |
+          DATA_DIR="$RUNNER_TEMP/stretch-ci" PORT=3999 HOST=127.0.0.1 \
+            node server.ts > server.log 2>&1 &
+          SERVER_PID=$!
+          ok=""
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:3999/api/health > /dev/null; then
+              ok=1
+              break
+            fi
+            sleep 0.5
+          done
+          kill "$SERVER_PID" 2>/dev/null || true
+          [ -n "$ok" ] || { cat server.log; exit 1; }
+          echo "server health check passed"

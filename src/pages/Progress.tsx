@@ -135,6 +135,8 @@ function BarChart({ bars, labels, ariaLabel }: BarChartProps) {
         if (bar.points <= 0) return null;
         return (
           <rect
+            // One bar per calendar day; the index is the day position.
+            // oxlint-disable-next-line react/no-array-index-key
             key={i}
             x={CHART_PAD + i * slot + (slot - barW) / 2}
             y={CHART_H - CHART_PAD - h}
@@ -206,9 +208,9 @@ export function Progress() {
     monthCursor.year === now.getFullYear() &&
     monthCursor.month === now.getMonth();
 
-  const shiftMonth = (delta: number) => {
+  const shiftMonth = (months: number) => {
     setMonthCursor(({ year, month }) => {
-      const d = new Date(year, month + delta, 1);
+      const d = new Date(year, month + months, 1);
       return { year: d.getFullYear(), month: d.getMonth() };
     });
   };

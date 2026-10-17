@@ -90,6 +90,7 @@ export function Settings() {
     setCompletedSessions(sessions);
     completedSessionsRef.current = sessions;
     setProfile(loadFromStorage<Profile>("stretch.profile", DEFAULT_PROFILE));
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [revision]);
 
   if (isLoading) {

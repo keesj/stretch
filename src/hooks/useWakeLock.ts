@@ -27,7 +27,7 @@ export function useWakeLock({ isActive = true }: UseWakeLockOptions): WakeLockRe
 
     try {
       // Guard against navigator.wakeLock being null or request not being a function
-      const wakeLock = (navigator as any).wakeLock;
+      const wakeLock = navigator.wakeLock;
       if (!wakeLock || typeof wakeLock.request !== "function") return;
 
       if (wakeLockRef.current) {

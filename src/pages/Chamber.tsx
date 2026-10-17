@@ -72,6 +72,8 @@ function Sparkles() {
     <>
       {SPARKLES.map((s, i) => (
         <motion.span
+          // Static const array; the index is a stable key.
+          // oxlint-disable-next-line react/no-array-index-key
           key={i}
           data-sparkle
           aria-hidden
@@ -116,6 +118,8 @@ function SparkleBurst({ x, y }: { x: number; y: number }) {
     >
       {BURST_PARTICLES.map((p, i) => (
         <motion.span
+          // Static const array; the index is a stable key.
+          // oxlint-disable-next-line react/no-array-index-key
           key={i}
           className="absolute select-none text-amber-200 drop-shadow-sm"
           style={{ fontSize: 12 }}
@@ -186,6 +190,7 @@ export function Chamber() {
     setProfile(loadFromStorage("stretch.profile", DEFAULT_PROFILE));
     setTrophyCase(normalizeTrophyCaseState(loadFromStorage<unknown>("stretch.trophyCase", DEFAULT_TROPHY_CASE)));
     setTick((t) => t + 1);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [revision]);
 
   const stats = useMemo(() => {
@@ -195,6 +200,7 @@ export function Chamber() {
       challenges.map((c) => ({ challenge: c, state: loadChallengeState(c) })),
       sessions
     );
+    // oxlint-disable-next-line react/memo-dependencies
   }, [tick]);
 
   const items = trophyCase.items;
@@ -382,6 +388,8 @@ export function Chamber() {
             const isSelected = selected === i;
             return (
               <div
+                // Fixed grid of slot positions; the index is the slot.
+                // oxlint-disable-next-line react/no-array-index-key
                 key={i}
                 className={`absolute ${held ? "pointer-events-none" : ""}`}
                 style={{

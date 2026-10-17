@@ -231,9 +231,14 @@ export function getYearBuckets(
 
   const bars: YearWeekBar[] = [];
   const yearEnd = new Date(year + 1, 0, 1);
-  let cursor = mondayOf(new Date(year, 0, 1));
+  const first = mondayOf(new Date(year, 0, 1));
   let weekNumber = 0;
-  while (cursor < yearEnd) {
+  // A plain number drives the loop; week k starts on first + 7k days.
+  // (A Date in the loop condition is not tracked by lint's mutation check.)
+  for (let daysIn = 0; ; daysIn += 7) {
+    const cursor = new Date(first);
+    cursor.setDate(first.getDate() + daysIn);
+    if (cursor >= yearEnd) break;
     weekNumber += 1;
     let points = 0;
     for (let i = 0; i < 7; i++) {
@@ -245,7 +250,6 @@ export function getYearBuckets(
       }
     }
     bars.push({ weekStart: toKey(cursor), weekNumber, points });
-    cursor.setDate(cursor.getDate() + 7);
   }
   return bars;
 }

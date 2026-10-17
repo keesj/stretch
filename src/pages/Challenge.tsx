@@ -39,6 +39,7 @@ export function Challenge() {
   const revision = useDataRevision();
   // Re-selected when the projection blobs change (e.g. a cohort opening
   // on another device mid-session).
+  // oxlint-disable-next-line react/memo-dependencies react-hooks/exhaustive-deps
   const challenge = useMemo(() => activeChallenge(), [revision]);
   const exercise = useMemo(
     () => stretchesData.find((s) => s.id === challenge.exerciseId),
@@ -80,6 +81,7 @@ export function Challenge() {
       return;
     }
     setPlankState(loadChallengeState(challenge));
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [revision, challenge]);
 
   const cancelCountdown = useCallback(() => {
@@ -360,6 +362,8 @@ export function Challenge() {
               <div className="w-full bg-white/60 dark:bg-gray-800/60 rounded-xl p-4 mb-8 space-y-2 text-left">
                 {readyInstructions.map((instruction, index) => (
                   <div
+                    // Static numbered instructions; the index is the key.
+                    // oxlint-disable-next-line react/no-array-index-key
                     key={index}
                     className="text-sm text-gray-600 dark:text-gray-300"
                   >

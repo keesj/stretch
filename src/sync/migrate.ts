@@ -115,6 +115,8 @@ export function legacyToOps(legacy: LegacyBase, device: string): Op[] {
 
   // Chronological (id breaks ties); the counter keeps equal ms ordered.
   pending.sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id));
+  // One-shot migration: the spread is the idiomatic immutable key swap.
+  // oxlint-disable-next-line oxc/no-map-spread
   return pending.map(({ timeMs, ...op }, i) => ({ ...op, hlc: hlcAt(timeMs, device, i) }));
 }
 

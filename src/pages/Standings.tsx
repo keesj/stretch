@@ -6,6 +6,7 @@ import { fetchStandings } from "../sync/syncClient";
 import { useSquads } from "../sync/useSquads";
 import { computeStandings, type StandingsView } from "../utils/standings";
 import { getUserId } from "../sync/identity";
+import { useDataRevision } from "../sync/dataChange";
 import { activeChallenge } from "../utils/challenge";
 import { formatTime } from "../utils/timer";
 
@@ -24,7 +25,9 @@ export function Standings() {
   // Every configured challenge is a shared-clock cohort, so the squad
   // always competes in whatever cohort the account is on right now (the
   // running one, the finished one during the rest gap, or the next one).
-  const cohort = useMemo(() => activeChallenge(), []);
+  const revision = useDataRevision();
+  // oxlint-disable-next-line react/memo-dependencies react-hooks/exhaustive-deps
+  const cohort = useMemo(() => activeChallenge(), [revision]);
   const { squads, loading: squadsLoading, refresh: refreshSquads } = useSquads();
   const [selectedSquadId, setSelectedSquadId] = useState<string | null>(null);
   const [view, setView] = useState<StandingsView | null>(null);
@@ -46,7 +49,7 @@ export function Standings() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cohort]);
 
   useEffect(() => {
     if (activeSquadId) void load(activeSquadId);
