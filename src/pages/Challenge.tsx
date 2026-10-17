@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "../components/Button";
 import { Timer } from "../components/Timer";
+import { ChallengeIntro } from "../components/ChallengeIntro";
+import { ChallengeReady } from "../components/ChallengeReady";
+import { ChallengeDone } from "../components/ChallengeDone";
 import { useTimer } from "../hooks/useTimer";
 import { useCountUp } from "../hooks/useCountUp";
 import { useBeep } from "../hooks/useBeep";
@@ -26,14 +29,12 @@ import { stretches as stretchesData } from "../data/stretches";
 
 type Phase = "intro" | "ready" | "countdown" | "holding" | "done";
 
-function formatOpenDate(dateKey: string): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    month: "long",
-    day: "numeric",
-  });
-}
-
+/**
+ * The challenge page: a phase machine (intro → ready → countdown →
+ * holding → done) around the active challenge. The phase screens are
+ * presentational components; the countdown + live holds stay here because
+ * they are driven directly by the timer hooks.
+ */
 export function Challenge() {
   const navigate = useNavigate();
   const revision = useDataRevision();
@@ -265,162 +266,23 @@ export function Challenge() {
           className="flex-1 flex flex-col"
         >
           {phase === "intro" && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.15 }}
-                className="text-7xl mb-6"
-              >
-                {challenge.illustration}
-              </motion.div>
-              <h1 className="text-3xl font-bold mb-3">{challenge.title}</h1>
-              <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-xs">
-                {challenge.description}
-              </p>
-              <div className="w-full space-y-2 mb-8 text-sm">
-                {isThreshold && (
-                  <>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        {Math.floor(challenge.baseSeconds / 60)} min plank, every day
-                      </span>
-                      <span className="font-semibold text-primary-600 dark:text-primary-400">+1 pt</span>
-                    </div>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Every {challenge.milestoneEvery}th day: {formatTime(challenge.milestoneSeconds)} plank (instead of {formatTime(challenge.baseSeconds)})
-                      </span>
-                      <span className="font-semibold text-primary-600 dark:text-primary-400">
-                        {challenge.milestonePoints} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        +{challenge.bonusSeconds}s extra hold (after a miss)
-                      </span>
-                      <span className="font-semibold text-primary-600 dark:text-primary-400">
-                        +{challenge.bonusPoints} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">Missed a day</span>
-                      <span className="font-semibold text-gray-500 dark:text-gray-400">0 pts</span>
-                    </div>
-                  </>
-                )}
-                {isDuration && (
-                  <>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        First {Math.floor(challenge.baseSeconds / 60)} min
-                      </span>
-                      <span className="font-semibold text-primary-600 dark:text-primary-400">+{challenge.basePoints} pt</span>
-                    </div>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Each extra {challenge.incrementSeconds}s
-                      </span>
-                      <span className="font-semibold text-primary-600 dark:text-primary-400">
-                        +{challenge.incrementPoints} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        {Math.floor(challenge.maxSeconds / 60)} min hold (max)
-                      </span>
-                      <span className="font-semibold text-primary-600 dark:text-primary-400">
-                        {maxPoints} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between px-4 py-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">Missed a day</span>
-                      <span className="font-semibold text-gray-500 dark:text-gray-400">0 pts</span>
-                    </div>
-                  </>
-                )}
-              </div>
-              {opensAt ? (
-                <div className="w-full rounded-lg bg-white/60 dark:bg-gray-800/60 px-4 py-3 text-sm font-semibold text-gray-600 dark:text-gray-300">
-                  Opens {formatOpenDate(opensAt)}
-                </div>
-              ) : (
-                <Button onClick={handleStartChallenge} className="w-full">
-                  Start Challenge
-                </Button>
-              )}
-            </div>
+            <ChallengeIntro
+              challenge={challenge}
+              maxPoints={maxPoints}
+              opensAt={opensAt}
+              onStart={handleStartChallenge}
+            />
           )}
 
           {phase === "ready" && exercise && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <div className="text-7xl mb-4">{exercise.illustration}</div>
-              <h1 className="text-2xl font-bold mb-2">Day {status.dayNumber}</h1>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Score: {status.score} pts
-              </div>
-              <div className="w-full bg-white/60 dark:bg-gray-800/60 rounded-xl p-4 mb-8 space-y-2 text-left">
-                {readyInstructions.map((instruction, index) => (
-                  <div
-                    // Static numbered instructions; the index is the key.
-                    // oxlint-disable-next-line react/no-array-index-key
-                    key={index}
-                    className="text-sm text-gray-600 dark:text-gray-300"
-                  >
-                    {index + 1}. {instruction}
-                  </div>
-                ))}
-              </div>
-              <div className="w-full space-y-3">
-                {isDuration && (
-                  <Button onClick={beginDurationHold} className="w-full">
-                    Start Plank
-                  </Button>
-                )}
-                {isThreshold && (
-                  <Button
-                    onClick={() => beginHold(challenge.baseSeconds)}
-                    className="w-full"
-                  >
-                    Begin {formatTime(challenge.baseSeconds)} Plank (+1 pt)
-                  </Button>
-                )}
-                {isThreshold && status.todayIsMilestone && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => beginHold(challenge.milestoneSeconds)}
-                    className="w-full"
-                  >
-                    Begin {formatTime(challenge.milestoneSeconds)} Plank (+{challenge.milestonePoints} pts)
-                  </Button>
-                )}
-                {isThreshold && status.bonusAvailable && (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      beginHold(challenge.baseSeconds + challenge.bonusSeconds)
-                    }
-                    className="w-full"
-                  >
-                    Hold {formatTime(challenge.baseSeconds + challenge.bonusSeconds)} (+{challenge.bonusPoints} extra)
-                  </Button>
-                )}
-              </div>
-              {isDuration ? (
-                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 max-w-xs">
-                  Hold as long as you can, then press stop. Your best hold of the day counts.
-                </p>
-              ) : status.bonusAvailable ? (
-                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 max-w-xs">
-                  You&apos;re behind the pace — the extra hold counts as +
-                  {challenge.bonusPoints} extra pts for today.
-                </p>
-              ) : status.todayIsMilestone ? (
-                <p className="mt-4 text-xs text-primary-600 dark:text-primary-400 max-w-xs">
-                  Milestone day — or hold the full {formatTime(challenge.milestoneSeconds)} and earn {challenge.milestonePoints} pts instead.
-                </p>
-              ) : null}
-            </div>
+            <ChallengeReady
+              exercise={exercise}
+              status={status}
+              challenge={challenge}
+              instructions={readyInstructions}
+              onBeginHold={beginHold}
+              onBeginDuration={beginDurationHold}
+            />
           )}
 
           {phase === "countdown" && (
@@ -499,51 +361,12 @@ export function Challenge() {
           )}
 
           {phase === "done" && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <motion.div
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 12 }}
-                className="text-7xl mb-4"
-              >
-                {status.status === "complete" || status.daysLeft === 0
-                  ? "🏆"
-                  : "🌅"}
-              </motion.div>
-              <h1 className="text-3xl font-bold mb-2">
-                Day {status.dayNumber} complete!
-              </h1>
-              {status.status !== "complete" && status.todaySeconds > 0 && (
-                <div className="text-gray-600 dark:text-gray-400 mb-2">
-                  {isDuration ? `Best hold today: ${formatTime(status.todaySeconds)}` : null}
-                </div>
-              )}
-              {status.status !== "complete" && (
-                <div className="text-primary-600 dark:text-primary-400 font-semibold mb-2">
-                  +{status.todayPoints} pts today
-                </div>
-              )}
-              <div className="text-gray-600 dark:text-gray-400 mb-2">
-                Total score: {status.score} pts
-              </div>
-              <div className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs">
-                {status.status === "complete" || status.daysLeft === 0
-                  ? "You finished the 30-day challenge. Amazing work!"
-                  : `${status.daysLeft} day${status.daysLeft === 1 ? "" : "s"} to go. Come back tomorrow!`}
-              </div>
-              <div className="w-full space-y-3">
-                <Button onClick={handleBack} className="w-full">
-                  Back to Home
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => navigate("/challenge/progress")}
-                  className="w-full"
-                >
-                  View progress
-                </Button>
-              </div>
-            </div>
+            <ChallengeDone
+              status={status}
+              isDuration={isDuration}
+              onBack={handleBack}
+              onProgress={() => navigate("/challenge/progress")}
+            />
           )}
         </motion.div>
       </AnimatePresence>
