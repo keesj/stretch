@@ -150,7 +150,7 @@ describe('Home Page', () => {
 
     expect(navigateMockRef.fn).toHaveBeenCalledWith('/session');
     expect(JSON.parse(activeSessionSaveCalls()[0][1])).toMatchObject({
-      routineId: 'shin-calf-release',
+      routineId: routinesData[routinesData.length - 1].id,
     });
   });
 

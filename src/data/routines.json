@@ -34,5 +34,11 @@
     "title": "Shin & Calf Release",
     "description": "Release your shins and calves after a long day on your feet",
     "stretches": ["ankle-circles-left", "ankle-circles-right", "seated-shin-stretch-left", "seated-shin-stretch-right", "wall-calf-stretch-left", "wall-calf-stretch-right", "downward-dog-wake", "soleus-stretch-left", "soleus-stretch-right", "childs-pose"]
+  },
+  {
+    "id": "running-warmup",
+    "title": "Running Warmup",
+    "description": "Prepare the chain that takes the impact — ankles, shins, and calves first, then hip flexors and hamstrings — before a run",
+    "stretches": ["ankle-circles-left", "ankle-circles-right", "seated-shin-stretch-left", "seated-shin-stretch-right", "wall-calf-stretch-left", "wall-calf-stretch-right", "soleus-stretch-left", "soleus-stretch-right", "lunge-left", "lunge-right", "toe-touch"]
   }
 ]
