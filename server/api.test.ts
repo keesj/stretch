@@ -337,6 +337,18 @@ describe('/api/sync/push', () => {
       { ops: [makeOp({ entity: 'settings', entityId: 'app', kind: 'patch', data: { theme: 'neon' } })] }
     );
     expect(badTheme.status).toBe(400);
+
+    const notificationFields = await post(
+      '/api/sync/push',
+      { ops: [makeOp({ entity: 'settings', entityId: 'app', kind: 'patch', data: { notificationsEnabled: true, remindEnabled: true, remindTime: '07:30' } })] }
+    );
+    expect(notificationFields.status).toBe(200);
+
+    const badRemindTime = await post(
+      '/api/sync/push',
+      { ops: [makeOp({ entity: 'settings', entityId: 'app', kind: 'patch', data: { remindTime: '25:99' } })] }
+    );
+    expect(badRemindTime.status).toBe(400);
   });
 
   test('rejects malformed ops and unknown entities', async () => {

@@ -11,13 +11,27 @@ export type StorageKey =
   // Display identity for the squad views (name + avatar).
   | "stretch.profile"
   // Trophy chamber decoration (background + shelf layout).
-  | "stretch.trophyCase";
+  | "stretch.trophyCase"
+  // Last date the challenge reminder fired (per device, not synced).
+  | "stretch.reminder";
 
 export interface Settings {
   theme: "light" | "dark" | "system";
   soundEnabled: boolean;
   hapticEnabled: boolean;
+  /** Master switch for browser notifications (Web Notification API). */
+  notificationsEnabled: boolean;
+  /**
+   * Challenge reminder: warn once a day at `remindTime` when today's
+   * challenge has not been completed yet.
+   */
+  remindEnabled: boolean;
+  /** 24h time ("HH:MM") the challenge reminder fires at. */
+  remindTime: string;
 }
+
+/** Strict 24h "HH:MM" — used to validate settings.remindTime on every layer. */
+export const REMIND_TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export interface CompletedSession {
   id: string;
@@ -39,6 +53,9 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
   soundEnabled: true,
   hapticEnabled: true,
+  notificationsEnabled: false,
+  remindEnabled: false,
+  remindTime: "19:00",
 };
 
 export function loadFromStorage<T>(key: StorageKey, defaultValue: T): T {

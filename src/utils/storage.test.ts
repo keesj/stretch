@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { loadFromStorage, saveToStorage, clearStorage } from './storage';
-import type { StorageKey, Settings } from './storage';
+import { DEFAULT_SETTINGS, type StorageKey, type Settings } from './storage';
 
 describe('utils/storage', () => {
   it('loadFromStorage returns parsed value when key exists', () => {
@@ -35,7 +35,7 @@ describe('utils/storage', () => {
   });
 
   it('saveToStorage saves value to localStorage', () => {
-    const settings: Settings = { theme: 'dark' as const, soundEnabled: false, hapticEnabled: true };
+    const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'dark' as const, soundEnabled: false };
     saveToStorage('settings' as StorageKey, settings);
     expect(localStorage.setItem).toHaveBeenCalledWith('settings', JSON.stringify(settings));
   });

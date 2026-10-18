@@ -145,6 +145,9 @@ export function patchSettings(patch: Partial<Settings>): Settings {
   if (patch.theme !== undefined) data.theme = patch.theme;
   if (patch.soundEnabled !== undefined) data.soundEnabled = patch.soundEnabled;
   if (patch.hapticEnabled !== undefined) data.hapticEnabled = patch.hapticEnabled;
+  if (patch.notificationsEnabled !== undefined) data.notificationsEnabled = patch.notificationsEnabled;
+  if (patch.remindEnabled !== undefined) data.remindEnabled = patch.remindEnabled;
+  if (patch.remindTime !== undefined) data.remindTime = patch.remindTime;
   if (Object.keys(data).length === 0) {
     const legacy = freezeLegacyIfNeeded();
     return replayOps(legacy, loadJournal()).settings;

@@ -1,10 +1,17 @@
 import { describe, test, expect } from "vitest";
-import { replayOps } from ".//replay";
+import { replayOps } from "./replay";
 import { DEFAULT_PROFILE, DEFAULT_TROPHY_CASE, type Op, type TrophyCaseState } from "./types";
 import type { PlankChallengeState } from "../types/challenge";
 import type { CompletedSession, Settings } from "../utils/storage";
 
-const DEFAULT_SETTINGS: Settings = { theme: "system", soundEnabled: true, hapticEnabled: true };
+const DEFAULT_SETTINGS: Settings = {
+  theme: "system",
+  soundEnabled: true,
+  hapticEnabled: true,
+  notificationsEnabled: false,
+  remindEnabled: false,
+  remindTime: "19:00",
+};
 
 function legacy(overrides: {
   plank?: PlankChallengeState;
@@ -132,7 +139,43 @@ describe("replayOps", () => {
       op({ id: "b", hlc: "b0", entity: "settings", entityId: "app", kind: "patch", data: { soundEnabled: false } }),
       op({ id: "c", hlc: "c0", entity: "settings", entityId: "app", kind: "patch", data: { theme: "light" } }),
     ]);
-    expect(state.settings).toEqual({ theme: "light", soundEnabled: false, hapticEnabled: true });
+    expect(state.settings).toEqual({
+      theme: "light",
+      soundEnabled: false,
+      hapticEnabled: true,
+      notificationsEnabled: false,
+      remindEnabled: false,
+      remindTime: "19:00",
+    });
+  });
+
+  test("a settings patch with the notification fields is applied; malformed times are dropped", () => {
+    const state = replayOps(legacy(), [
+      op({ id: "a", hlc: "a0", entity: "settings", entityId: "app", kind: "patch", data: { notificationsEnabled: true, remindEnabled: true, remindTime: "07:30" } }),
+      op({ id: "b", hlc: "b0", entity: "settings", entityId: "app", kind: "patch", data: { remindTime: "25:99" } }),
+    ]);
+    expect(state.settings.notificationsEnabled).toBe(true);
+    expect(state.settings.remindEnabled).toBe(true);
+    // The malformed time is rejected; the earlier valid one survives.
+    expect(state.settings.remindTime).toBe("07:30");
+  });
+
+  test("a legacy base frozen by an older build gains the notification defaults", () => {
+    const state = replayOps(
+      legacy({
+        // An older build's frozen base: no notification fields.
+        settings: { theme: "dark", soundEnabled: true, hapticEnabled: true } as unknown as Settings,
+      }),
+      []
+    );
+    expect(state.settings).toEqual({
+      theme: "dark",
+      soundEnabled: true,
+      hapticEnabled: true,
+      notificationsEnabled: false,
+      remindEnabled: false,
+      remindTime: "19:00",
+    });
   });
 
   test("a reset clears every challenge and the sessions but keeps settings", () => {

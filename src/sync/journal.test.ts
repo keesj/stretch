@@ -53,7 +53,14 @@ describe("legacy freeze", () => {
     const legacy = freezeLegacyIfNeeded();
     expect(legacy.plank).toEqual({ startedAt: null, days: [] });
     expect(legacy.sessions).toEqual([]);
-    expect(legacy.settings).toEqual({ theme: "system", soundEnabled: true, hapticEnabled: true });
+    expect(legacy.settings).toEqual({
+      theme: "system",
+      soundEnabled: true,
+      hapticEnabled: true,
+      notificationsEnabled: false,
+      remindEnabled: false,
+      remindTime: "19:00",
+    });
     expect(readLegacy()).toEqual(legacy);
   });
 
@@ -113,6 +120,9 @@ describe("projectWith", () => {
       theme: "system",
       soundEnabled: true,
       hapticEnabled: true,
+      notificationsEnabled: false,
+      remindEnabled: false,
+      remindTime: "19:00",
     });
   });
 });

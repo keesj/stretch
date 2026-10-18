@@ -5,7 +5,7 @@ import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { SyncCard } from "../components/SyncCard";
 import { useTheme } from "../hooks/useTheme";
-import { loadFromStorage, DEFAULT_SETTINGS, type Settings, type CompletedSession } from "../utils/storage";
+import { loadFromStorage, DEFAULT_SETTINGS, REMIND_TIME_RE, type Settings, type CompletedSession } from "../utils/storage";
 import { patchSettings, recordProfile, resetProgress } from "../sync/record";
 import { DEFAULT_PROFILE, type Profile } from "../sync/types";
 import { AVATARS } from "../utils/display";
@@ -236,6 +236,57 @@ export function Settings() {
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
               </label>
             </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <h2 className="text-lg font-semibold mb-4">Notifications</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span>Notifications</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.notificationsEnabled}
+                  onChange={(e) => {
+                    updateSettings({ notificationsEnabled: e.target.checked });
+                    // Opting in asks the browser once; the reminder degrades
+                    // to the in-app banner if permission is not granted.
+                    if (e.target.checked && typeof Notification !== "undefined" && Notification.permission === "default") {
+                      void Notification.requestPermission();
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+              </label>
+            </div>
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={settings.remindEnabled}
+                onChange={(e) => updateSettings({ remindEnabled: e.target.checked })}
+                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 dark:border-gray-600"
+              />
+              <span>
+                Remind me if today&apos;s challenge is still pending
+              </span>
+            </label>
+            {settings.remindEnabled && (
+              <div className="flex items-center justify-between">
+                <span>Remind at</span>
+                <input
+                  type="time"
+                  value={settings.remindTime}
+                  onChange={(e) => {
+                    if (e.target.value && REMIND_TIME_RE.test(e.target.value)) {
+                      updateSettings({ remindTime: e.target.value });
+                    }
+                  }}
+                  className="input py-2 px-3"
+                />
+              </div>
+            )}
           </div>
         </Card>
 

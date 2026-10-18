@@ -57,6 +57,50 @@ describe('Settings Page', () => {
     expect(screen.getByText('Haptic Feedback')).toBeInTheDocument();
   });
 
+  it('renders the Notifications section with defaults (off, time hidden)', () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'Notifications' })).toBeInTheDocument();
+
+    const row = screen.getByText('Notifications', { selector: 'span' }).closest('.flex') as HTMLElement;
+    expect(within(row).getByRole('checkbox')).not.toBeChecked();
+
+    const reminder = screen.getByLabelText("Remind me if today's challenge is still pending");
+    expect(reminder).not.toBeChecked();
+    // The time input only appears once the reminder is enabled.
+    expect(screen.queryByDisplayValue('19:00')).not.toBeInTheDocument();
+  });
+
+  it('asks for browser permission and persists the setting when notifications are enabled', async () => {
+    const user = userEvent.setup();
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission });
+
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    const row = screen.getByText('Notifications', { selector: 'span' }).closest('.flex') as HTMLElement;
+    await user.click(within(row).getByRole('checkbox'));
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(lastSavedSettings()).toMatchObject({ notificationsEnabled: true });
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the time input when the reminder is enabled and persists changes', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    const reminder = screen.getByLabelText("Remind me if today's challenge is still pending");
+    await user.click(reminder);
+
+    const timeInput = screen.getByDisplayValue('19:00');
+    fireEvent.change(timeInput, { target: { value: '07:30' } });
+
+    expect(lastSavedSettings()).toMatchObject({
+      remindEnabled: true,
+      remindTime: '07:30',
+    });
+  });
+
   it('shows the build date in the About section', () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 

@@ -1,8 +1,8 @@
 import { compareHlc } from "./hlc";
 import { LEGACY_PLANK_SYNC_ID, SYNC_ID_RE, DEFAULT_PROFILE, DEFAULT_TROPHY_CASE } from "./types";
-import type { Op, PlacedItem, Profile, TrophyCaseState } from "./types";
+import type { LegacyBase, Op, PlacedItem, Profile, TrophyCaseState } from "./types";
 import type { PlankChallengeState, ChallengeDay } from "../types/challenge";
-import type { CompletedSession, Settings } from "../utils/storage";
+import { DEFAULT_SETTINGS, REMIND_TIME_RE, type CompletedSession, type Settings } from "../utils/storage";
 
 /** What replayOps returns: the device's full projected state. */
 export interface ProjectedState {
@@ -128,16 +128,7 @@ function challengeOf(
  * - reset clears all challenges and sessions (settings, profile, and the
  *   trophy case survive — they are identity/preferences, not progress)
  */
-export function replayOps(
-  legacy: {
-    plank: PlankChallengeState;
-    sessions: CompletedSession[];
-    settings: Settings;
-    profile: Profile;
-    trophyCase: TrophyCaseState;
-  },
-  ops: Op[]
-): ProjectedState {
+export function replayOps(legacy: LegacyBase, ops: Op[]): ProjectedState {
   const sorted = [...ops].sort((a, b) => compareHlc(a.hlc, b.hlc));
 
   // The frozen legacy base is the legacy self-start challenge's state.
@@ -149,7 +140,9 @@ export function replayOps(
   };
   let sessions: CompletedSession[] = [...legacy.sessions];
   const sessionIds = new Set(sessions.map((s) => s.id));
-  let settings: Settings = { ...legacy.settings };
+  // A base frozen by an older build lacks the notification fields; start
+  // from the defaults so they are never undefined.
+  let settings: Settings = { ...DEFAULT_SETTINGS, ...legacy.settings };
   let profile: Profile = { ...DEFAULT_PROFILE, ...legacy.profile };
   // A legacy base frozen by an older build may still carry the pre-canvas
   // `slots` shape; normalize it so that decoration survives re-projection.
@@ -211,6 +204,9 @@ export function replayOps(
         }
         if (typeof d.soundEnabled === "boolean") settings.soundEnabled = d.soundEnabled;
         if (typeof d.hapticEnabled === "boolean") settings.hapticEnabled = d.hapticEnabled;
+        if (typeof d.notificationsEnabled === "boolean") settings.notificationsEnabled = d.notificationsEnabled;
+        if (typeof d.remindEnabled === "boolean") settings.remindEnabled = d.remindEnabled;
+        if (typeof d.remindTime === "string" && REMIND_TIME_RE.test(d.remindTime)) settings.remindTime = d.remindTime;
         break;
       }
       case "profile": {

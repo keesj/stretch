@@ -150,7 +150,14 @@ describe("patchSettings", () => {
   test("records a settings patch op and projects the change", () => {
     const settings = patchSettings({ theme: "dark" });
 
-    expect(settings).toEqual({ theme: "dark", soundEnabled: true, hapticEnabled: true });
+    expect(settings).toEqual({
+      theme: "dark",
+      soundEnabled: true,
+      hapticEnabled: true,
+      notificationsEnabled: false,
+      remindEnabled: false,
+      remindTime: "19:00",
+    });
     const journal = loadJournal();
     expect(journal[0]).toMatchObject({ entity: "settings", entityId: "app", kind: "patch" });
     expect(journal[0].data).toEqual({ theme: "dark" });

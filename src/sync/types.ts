@@ -115,7 +115,16 @@ export const DEFAULT_TROPHY_CASE: TrophyCaseState = { background: "classic", ite
 export interface LegacyBase {
   plank: { startedAt: string | null; days: { date: string; seconds: number }[] };
   sessions: { id: string; routineId: string; routineTitle: string; duration: number; completedAt: string }[];
-  settings: { theme: "light" | "dark" | "system"; soundEnabled: boolean; hapticEnabled: boolean };
+  settings: {
+    theme: "light" | "dark" | "system";
+    soundEnabled: boolean;
+    hapticEnabled: boolean;
+    // A base frozen by an older build lacks the notification fields;
+    // replay fills them from the defaults.
+    notificationsEnabled?: boolean;
+    remindEnabled?: boolean;
+    remindTime?: string;
+  };
   profile: Profile;
   trophyCase: TrophyCaseState;
 }

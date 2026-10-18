@@ -12,6 +12,7 @@ import { Standings } from "./pages/Standings";
 import { Chamber } from "./pages/Chamber";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ChallengeReminder } from "./components/ChallengeReminder";
 import { useLocation } from "react-router-dom";
 
 const FULLSCREEN_ROUTES = ["/session", "/challenge"];
@@ -49,6 +50,8 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        {/* Works on every route: the once-daily challenge reminder. */}
+        <ChallengeReminder />
         <div className="min-h-screen bg-calm-50 dark:bg-gray-900">
           <Routes>
             <Route path="/" element={<Home />} />

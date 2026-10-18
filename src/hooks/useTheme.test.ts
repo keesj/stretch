@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTheme } from './useTheme';
-import type { Settings } from '../utils/storage';
+import { DEFAULT_SETTINGS, type Settings } from '../utils/storage';
 
 describe('useTheme', () => {
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe('useTheme', () => {
       removeEventListener: vi.fn(),
     }));
 
-    const settings: Settings = { theme: 'light' as const, soundEnabled: true, hapticEnabled: true };
+    const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'light' as const };
 
     renderHook(() => useTheme(settings));
 
@@ -34,7 +34,7 @@ describe('useTheme', () => {
       removeEventListener: vi.fn(),
     }));
 
-    const settings: Settings = { theme: 'dark' as const, soundEnabled: true, hapticEnabled: true };
+    const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'dark' as const };
 
     renderHook(() => useTheme(settings));
 
@@ -50,7 +50,7 @@ describe('useTheme', () => {
     
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mediaQueryMock));
 
-    const settings: Settings = { theme: 'system' as const, soundEnabled: true, hapticEnabled: true };
+    const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'system' as const };
 
     renderHook(() => useTheme(settings));
 
@@ -66,7 +66,7 @@ describe('useTheme', () => {
 
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mediaQueryMock));
 
-    const settings: Settings = { theme: 'system' as const, soundEnabled: true, hapticEnabled: true };
+    const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'system' as const };
     document.documentElement.className = 'dark';
 
     renderHook(() => useTheme(settings));
@@ -83,7 +83,7 @@ describe('useTheme', () => {
 
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mediaQueryMock));
 
-    const settings: Settings = { theme: 'light' as const, soundEnabled: true, hapticEnabled: true };
+    const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'light' as const };
     document.documentElement.className = 'dark';
 
     renderHook(() => useTheme(settings));
@@ -98,7 +98,7 @@ describe('useTheme', () => {
       removeEventListener: vi.fn(),
     }));
 
-    const make = (theme: Settings['theme']): Settings => ({ theme, soundEnabled: true, hapticEnabled: true });
+    const make = (theme: Settings['theme']): Settings => ({ ...DEFAULT_SETTINGS, theme });
     const { rerender } = renderHook(({ settings }: { settings: Settings }) => useTheme(settings), {
       initialProps: { settings: make('light') },
     });
@@ -122,7 +122,7 @@ describe('useTheme', () => {
 
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mediaQueryMock));
 
-    const settings: Settings = { theme: 'system' as const, soundEnabled: true, hapticEnabled: true };
+    const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'system' as const };
     document.documentElement.className = 'dark';
 
     renderHook(() => useTheme(settings));

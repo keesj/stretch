@@ -6,6 +6,7 @@ import path from 'path';
 import { createSyncDb, type SyncDb } from './syncDb.ts';
 import { HLC_RE } from '../src/sync/hlc.ts';
 import { MAX_ITEMS } from '../src/sync/types.ts';
+import { REMIND_TIME_RE } from '../src/utils/storage.ts';
 import { CHALLENGE_IDS, CHALLENGE_START_AHEAD_MS, COHORT_CHALLENGE_IDS } from './challenges.ts';
 import type { Op } from '../src/sync/types.ts';
 
@@ -200,8 +201,10 @@ export function validateStretchOp(op: Op, nowMs: number = Date.now()): string | 
     for (const [key, value] of Object.entries(op.data)) {
       if (key === 'theme') {
         if (value !== 'light' && value !== 'dark' && value !== 'system') return 'settings theme is invalid';
-      } else if (key === 'soundEnabled' || key === 'hapticEnabled') {
+      } else if (key === 'soundEnabled' || key === 'hapticEnabled' || key === 'notificationsEnabled' || key === 'remindEnabled') {
         if (typeof value !== 'boolean') return `settings ${key} must be a boolean`;
+      } else if (key === 'remindTime') {
+        if (typeof value !== 'string' || !REMIND_TIME_RE.test(value)) return 'settings remindTime must be HH:MM (24h)';
       } else {
         return `unknown settings field: ${key}`;
       }
