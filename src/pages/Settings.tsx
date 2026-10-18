@@ -6,6 +6,7 @@ import { Button } from "../components/Button";
 import { SyncCard } from "../components/SyncCard";
 import { useTheme } from "../hooks/useTheme";
 import { loadFromStorage, DEFAULT_SETTINGS, REMIND_TIME_RE, type Settings, type CompletedSession } from "../utils/storage";
+import { sendTestNotification, type TestNotificationResult } from "../utils/notifications";
 import { patchSettings, recordProfile, resetProgress } from "../sync/record";
 import { DEFAULT_PROFILE, type Profile } from "../sync/types";
 import { AVATARS } from "../utils/display";
@@ -16,6 +17,7 @@ export function Settings() {
   const [settings, setSettings] = useState<Settings>(() =>
     loadFromStorage("settings", DEFAULT_SETTINGS)
   );
+  const [testResult, setTestResult] = useState<TestNotificationResult | null>(null);
   const [profile, setProfile] = useState<Profile>(() =>
     loadFromStorage("stretch.profile", DEFAULT_PROFILE)
   );
@@ -249,6 +251,8 @@ export function Settings() {
                   type="checkbox"
                   checked={settings.notificationsEnabled}
                   onChange={(e) => {
+                    // A stale test result no longer describes the setup.
+                    setTestResult(null);
                     updateSettings({ notificationsEnabled: e.target.checked });
                     // Opting in asks the browser once; the reminder degrades
                     // to the in-app banner if permission is not granted.
@@ -285,6 +289,31 @@ export function Settings() {
                   }}
                   className="input py-2 px-3"
                 />
+              </div>
+            )}
+            {settings.notificationsEnabled && (
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    void sendTestNotification().then(setTestResult);
+                  }}
+                >
+                  Send test notification
+                </Button>
+                {testResult && (
+                  <p
+                    role="status"
+                    className={`text-sm ${
+                      testResult.ok
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {testResult.message}
+                  </p>
+                )}
               </div>
             )}
           </div>

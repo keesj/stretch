@@ -101,6 +101,66 @@ describe('Settings Page', () => {
     });
   });
 
+  it('shows the test notification button only when notifications are enabled', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') });
+
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    expect(screen.queryByRole('button', { name: 'Send test notification' })).not.toBeInTheDocument();
+
+    const row = screen.getByText('Notifications', { selector: 'span' }).closest('.flex') as HTMLElement;
+    await user.click(within(row).getByRole('checkbox'));
+
+    expect(screen.getByRole('button', { name: 'Send test notification' })).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('sends a test notification and reports success', async () => {
+    const user = userEvent.setup();
+    const NotificationStub = Object.assign(
+      function () {},
+      {
+        permission: 'default' as NotificationPermission,
+        requestPermission: vi.fn(async () => 'granted' as NotificationPermission),
+      }
+    );
+    vi.stubGlobal('Notification', NotificationStub);
+
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    const row = screen.getByText('Notifications', { selector: 'span' }).closest('.flex') as HTMLElement;
+    await user.click(within(row).getByRole('checkbox'));
+
+    await user.click(screen.getByRole('button', { name: 'Send test notification' }));
+
+    expect(await screen.findByText(/test notification sent/i)).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('reports blocked notifications when permission is denied (and never re-asks)', async () => {
+    const user = userEvent.setup();
+    const NotificationStub = Object.assign(
+      function () {},
+      {
+        permission: 'denied' as NotificationPermission,
+        requestPermission: vi.fn(async () => 'denied' as NotificationPermission),
+      }
+    );
+    vi.stubGlobal('Notification', NotificationStub);
+
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    const row = screen.getByText('Notifications', { selector: 'span' }).closest('.flex') as HTMLElement;
+    await user.click(within(row).getByRole('checkbox'));
+
+    await user.click(screen.getByRole('button', { name: 'Send test notification' }));
+
+    expect(await screen.findByText(/blocked/i)).toBeInTheDocument();
+    expect(NotificationStub.requestPermission).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it('shows the build date in the About section', () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
