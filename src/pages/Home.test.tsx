@@ -81,8 +81,8 @@ describe('Home Page', () => {
     expect(plankCalls).toHaveLength(0);
   });
 
-  it('shows the finished plank cohort during the rest gap', () => {
-    vi.setSystemTime(new Date(2026, 9, 26, 12)); // Oct 26: the window closed, plank-max opens Oct 28
+  it('keeps the finished plank cohort on the front page for two days after it ends', () => {
+    vi.setSystemTime(new Date(2026, 9, 26, 12)); // Oct 26: first day after the window
     (localStorage.getItem as ReturnType<typeof vi.fn>).mockImplementation((key: string) => {
       if (key === 'completedSessions') return '[]';
       if (key === 'plankChallenge') {
@@ -94,13 +94,36 @@ describe('Home Page', () => {
       return null;
     });
 
-    render(<MemoryRouter><Home /></MemoryRouter>);
+    const { rerender } = render(<MemoryRouter><Home /></MemoryRouter>);
 
-    // The card is the finished plank cohort, not the upcoming plank-max.
     expect(screen.getByText('30-Day Plank Challenge')).toBeInTheDocument();
     expect(screen.getByText('Challenge complete 🏆')).toBeInTheDocument();
     expect(screen.getByText('Finished')).toBeDisabled();
+
+    // Still there on the second day after the window.
+    vi.setSystemTime(new Date(2026, 9, 27, 12));
+    rerender(<MemoryRouter><Home /></MemoryRouter>);
+    expect(screen.getByText('Challenge complete 🏆')).toBeInTheDocument();
+  });
+
+  it('removes the finished challenge after the two-day grace period', () => {
+    vi.setSystemTime(new Date(2026, 10, 29, 12)); // Nov 29: plank-max ended Nov 26
+    mockStoredSessions([]);
+
+    render(<MemoryRouter><Home /></MemoryRouter>);
+
+    expect(screen.queryByText('Challenges')).not.toBeInTheDocument();
     expect(screen.queryByText('30-Day Plank Max Challenge')).not.toBeInTheDocument();
+  });
+
+  it('shows the next challenge once its cohort opens', () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 12)); // Oct 28: plank-max opens
+    mockStoredSessions([]);
+
+    render(<MemoryRouter><Home /></MemoryRouter>);
+
+    expect(screen.getByText('Challenges')).toBeInTheDocument();
+    expect(screen.getByText('30-Day Plank Max Challenge')).toBeInTheDocument();
   });
 
   it('shows session stats when sessions exist', () => {

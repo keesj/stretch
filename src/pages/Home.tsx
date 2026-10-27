@@ -16,12 +16,17 @@ import {
   startChallenge,
   getChallengeStatus,
   challengeBlobKey,
+  addDays,
+  todayKey,
 } from "../utils/challenge";
 import type { PlankChallengeState } from "../types/challenge";
 import { useDataRevision } from "../sync/dataChange";
 
 import { routines as routinesData } from "../data/routines";
 import { stretches as stretchesData } from "../data/stretches";
+
+/** Days a completed challenge stays on the front page after its last day. */
+const COMPLETED_CHALLENGE_GRACE_DAYS = 2;
 
 export function Home() {
   const navigate = useNavigate();
@@ -41,6 +46,14 @@ export function Home() {
 
   const plankStatus = getChallengeStatus(plankChallenge, plankState);
   const challengeBlob = challengeBlobKey(plankChallenge.syncId);
+  // A finished challenge stays on the front page for a couple of days so the
+  // result is visible, then it gives way to the next challenge.
+  const challengeEnd = plankState.startedAt
+    ? addDays(plankState.startedAt, plankChallenge.totalDays - 1)
+    : null;
+  const showChallenge =
+    plankStatus.status !== "complete" ||
+    (challengeEnd !== null && todayKey() <= addDays(challengeEnd, COMPLETED_CHALLENGE_GRACE_DAYS));
 
   useEffect(() => {
     const loadSessions = () => {
@@ -179,23 +192,28 @@ export function Home() {
         </motion.div>
       )}
 
-      <section className="mb-6">
-        <h2 className="text-lg font-semibold mb-3">Challenges</h2>
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.15 }}
-        >
-          <ChallengeCard
-            challenge={plankChallenge}
-            status={plankStatus}
-            onStart={handleStartChallenge}
-            onBegin={handleBeginChallenge}
-            onRestart={handleRestartChallenge}
-            onProgress={() => navigate("/challenge/progress")}
-          />
-        </motion.div>
-      </section>
+      {/* A finished challenge lingers briefly, then leaves the front page;
+          the next one appears when it opens. History stays available from
+          the Progress tab. */}
+      {showChallenge && (
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold mb-3">Challenges</h2>
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.15 }}
+          >
+            <ChallengeCard
+              challenge={plankChallenge}
+              status={plankStatus}
+              onStart={handleStartChallenge}
+              onBegin={handleBeginChallenge}
+              onRestart={handleRestartChallenge}
+              onProgress={() => navigate("/challenge/progress")}
+            />
+          </motion.div>
+        </section>
+      )}
 
       <section className="mb-6">
         <h2 className="text-lg font-semibold mb-3">Featured</h2>
